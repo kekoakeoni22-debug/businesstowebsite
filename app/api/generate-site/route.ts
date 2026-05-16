@@ -15,24 +15,6 @@ function jsonError(status: number, message: string) {
   });
 }
 
-function isPaidUser(user: any): boolean {
-  const appMeta = user?.app_metadata || {};
-  const userMeta = user?.user_metadata || {};
-  const fromMetadata =
-    appMeta?.btw_pro === true ||
-    appMeta?.is_pro === true ||
-    userMeta?.btw_pro === true ||
-    userMeta?.is_pro === true;
-
-  const allowlist = (process.env.PRO_USER_IDS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const fromAllowlist = allowlist.includes(user?.id || "");
-
-  return fromMetadata || fromAllowlist;
-}
-
 async function hasActiveStripeSubscription(email?: string | null): Promise<boolean> {
   if (!email) return false;
   const stripeKey = process.env.STRIPE_SECRET_KEY;
@@ -47,13 +29,10 @@ async function hasActiveStripeSubscription(email?: string | null): Promise<boole
     limit: 10,
   });
   return subs.data.some((s) =>
-    ["active", "trialing", "past_due", "unpaid"].includes(s.status) &&
-    !s.cancel_at_period_end
-  ) || subs.data.some((s) =>
-    ["active", "trialing", "past_due", "unpaid"].includes(s.status) &&
-    s.cancel_at_period_end
+    ["active", "trialing", "past_due", "unpaid"].includes(s.status)
   );
 }
+
 
 export async function POST(req: NextRequest) {
   // Sign-in is required for Gemini generation specifically — every call to
@@ -64,12 +43,9 @@ export async function POST(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return jsonError(401, "Sign in required to generate a website.");
-  const paidFromStripe = await hasActiveStripeSubscription(user.email);
-  if (!isPaidUser(user) && !paidFromStripe) {
-    return jsonError(
-      402,
-      "Pro subscription required to generate websites."
-    );
+  const paid = await hasActiveStripeSubscription(user.email);
+  if (!paid) {
+    return jsonError(402, "Pro subscription required to generate websites.");
   }
 
   const apiKey = process.env.GEMINI_API_KEY;

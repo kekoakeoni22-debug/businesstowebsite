@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import SearchClient from "./search-client";
+import Stripe from "stripe";
 
 export default async function Home() {
   const h = await headers();
@@ -32,14 +33,36 @@ export default async function Home() {
   const isAnonymous = !user || user.is_anonymous === true;
   let credits = 0;
   if (user && !isAnonymous) {
+    let paid = false;
+    const stripeKey = process.env.STRIPE_SECRET_KEY || "";
+    if (stripeKey && user.email) {
+      try {
+        const stripe = new Stripe(stripeKey);
+        const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+        const customer = customers.data[0];
+        if (customer) {
+          const subs = await stripe.subscriptions.list({
+            customer: customer.id,
+            status: "all",
+            limit: 10,
+          });
+          paid = subs.data.some((s) =>
+            ["active", "trialing", "past_due", "unpaid"].includes(s.status)
+          );
+        }
+      } catch {
+        paid = false;
+      }
+    }
     const { data: creditData } = await supabase.rpc("get_user_credits", {
       p_user_id: user.id,
-      p_monthly: 4000,
+      p_monthly: paid ? 4000 : 0,
     });
     credits =
       typeof creditData === "number"
         ? creditData
-        : Number.parseInt(String(creditData || 4000), 10) || 4000;
+        : Number.parseInt(String(creditData || (paid ? 4000 : 0)), 10) ||
+          (paid ? 4000 : 0);
   }
 
   const mapsKey: string | null =

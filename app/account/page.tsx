@@ -13,15 +13,6 @@ export default async function AccountPage() {
     redirect("/");
   }
 
-  const { data: creditData } = await supabase.rpc("get_user_credits", {
-    p_user_id: user.id,
-    p_monthly: 4000,
-  });
-  const credits =
-    typeof creditData === "number"
-      ? creditData
-      : Number.parseInt(String(creditData || 4000), 10) || 4000;
-
   const stripeKey = process.env.STRIPE_SECRET_KEY || "";
   let subscriptionStatus: "Paid" | "Free" = "Free";
   let renewsAtLabel = "N/A";
@@ -59,6 +50,15 @@ export default async function AccountPage() {
       // Keep graceful fallback so account page still renders.
     }
   }
+  const monthlyCredits = subscriptionStatus === "Paid" ? 4000 : 0;
+  const { data: creditData } = await supabase.rpc("get_user_credits", {
+    p_user_id: user.id,
+    p_monthly: monthlyCredits,
+  });
+  const credits =
+    typeof creditData === "number"
+      ? creditData
+      : Number.parseInt(String(creditData || monthlyCredits), 10) || monthlyCredits;
 
   return (
     <div className="app-shell">
