@@ -20,7 +20,8 @@ export type FillExtras = {
   PHOTO_4?: string;
   PHOTO_5?: string;
   PHOTO_6?: string;
-  MAP_IMAGE?: string;
+  // Public Google Maps iframe embed URL (no API key, free).
+  MAP_EMBED_URL?: string;
 };
 
 const STOPWORDS = new Set([
@@ -138,17 +139,23 @@ Style \`.gallery-grid\` as a responsive grid (e.g. \`display: grid; grid-templat
 
 LOCATION MAP (INCLUDE — WRAPPED CONDITIONALLY)
 
-Just above the contact/footer, add a "Visit us" or "Find us" section with a static map image. Wrap the entire section in {{#MAP_IMAGE}}...{{/MAP_IMAGE}} so it vanishes if no map data is provided:
+Just above the contact/footer, add a "Visit us" or "Find us" section that embeds an interactive Google Maps iframe of the business's location. Wrap the entire section in {{#MAP_EMBED_URL}}...{{/MAP_EMBED_URL}} so it vanishes if no map URL is provided:
 
-{{#MAP_IMAGE}}
+{{#MAP_EMBED_URL}}
 <section class="map-section">
   <h2>Visit us</h2>
-  <img class="location-map" src="{{MAP_IMAGE}}" alt="Map showing the location of {{BUSINESS_NAME}}" />
+  <iframe
+    class="location-map"
+    src="{{MAP_EMBED_URL}}"
+    loading="lazy"
+    referrerpolicy="no-referrer-when-downgrade"
+    title="Map showing the location of {{BUSINESS_NAME}}"
+  ></iframe>
   <p class="address-under-map"><a href="{{ADDRESS_MAPS_URL}}" target="_blank" rel="noreferrer">{{ADDRESS}}</a></p>
 </section>
-{{/MAP_IMAGE}}
+{{/MAP_EMBED_URL}}
 
-Style \`.location-map\` as \`width: 100%; max-width: 720px; border-radius: 12px; display: block; margin: 0 auto;\`.
+Style \`.location-map\` as \`width: 100%; height: 420px; border: 0; border-radius: 12px; display: block;\`. Do NOT use an <img> here — this is an <iframe> that loads Google Maps interactively.
 
 OTHER IMAGES
 The ONLY <img> tags allowed on the page are:
@@ -234,7 +241,7 @@ export function fillTemplate(
     PHOTO_4: extras.PHOTO_4 || "",
     PHOTO_5: extras.PHOTO_5 || "",
     PHOTO_6: extras.PHOTO_6 || "",
-    MAP_IMAGE: extras.MAP_IMAGE || "",
+    MAP_EMBED_URL: extras.MAP_EMBED_URL || "",
   };
 
   // 1) Strip conditional blocks {{#KEY}}...{{/KEY}} whose key is missing.

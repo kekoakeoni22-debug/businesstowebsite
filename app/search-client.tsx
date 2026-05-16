@@ -330,23 +330,27 @@ export default function SearchClient({
 
   // Fast extras for in-iframe previews: use the proxy/direct URLs we
   // already have. No extra fetching needed.
+  function buildMapEmbedUrl(p: Place): string | undefined {
+    // Public, no-API-key Google Maps embed. Prefer name + address so the
+    // embed shows the business label card; fall back to lat/lng for a
+    // plain pin if those aren't available.
+    const text = [p.name, p.address].filter(Boolean).join(" ").trim();
+    if (text) {
+      return `https://maps.google.com/maps?q=${encodeURIComponent(text)}&z=15&output=embed`;
+    }
+    if (typeof p.lat === "number" && typeof p.lng === "number") {
+      return `https://maps.google.com/maps?q=${p.lat},${p.lng}&z=15&output=embed`;
+    }
+    return undefined;
+  }
+
   function buildPreviewExtras(p: Place): FillExtras {
     const extras: FillExtras = {};
     (p.photos || []).slice(0, 6).forEach((url, i) => {
       (extras as any)[`PHOTO_${i + 1}`] = url;
     });
-    if (
-      mapsKey &&
-      typeof p.lat === "number" &&
-      typeof p.lng === "number"
-    ) {
-      extras.MAP_IMAGE =
-        `https://maps.googleapis.com/maps/api/staticmap` +
-        `?center=${p.lat},${p.lng}` +
-        `&zoom=15&size=800x400&scale=2` +
-        `&markers=color:red%7C${p.lat},${p.lng}` +
-        `&key=${encodeURIComponent(mapsKey)}`;
-    }
+    const embed = buildMapEmbedUrl(p);
+    if (embed) extras.MAP_EMBED_URL = embed;
     return extras;
   }
 
@@ -367,22 +371,16 @@ export default function SearchClient({
         .catch(() => null)
     );
 
-    const mapPromise =
-      typeof p.lat === "number" && typeof p.lng === "number"
-        ? fetch(`/api/static-map-data?lat=${p.lat}&lng=${p.lng}`)
-            .then((r) => (r.ok ? r.text() : null))
-            .catch(() => null)
-        : Promise.resolve(null);
-
-    const [photoDataUrls, mapDataUrl] = await Promise.all([
-      Promise.all(photoPromises),
-      mapPromise,
-    ]);
+    const photoDataUrls = await Promise.all(photoPromises);
 
     photoDataUrls.forEach((url, i) => {
       if (url) (extras as any)[`PHOTO_${i + 1}`] = url;
     });
-    if (mapDataUrl) extras.MAP_IMAGE = mapDataUrl;
+
+    // The map embed is a public Google Maps iframe URL — no API key, no
+    // server fetch needed. Same URL works for preview and published HTML.
+    const embed = buildMapEmbedUrl(p);
+    if (embed) extras.MAP_EMBED_URL = embed;
     return extras;
   }
 
