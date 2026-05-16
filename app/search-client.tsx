@@ -566,6 +566,19 @@ export default function SearchClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           placeId: previewFor.id,
+          resumePlace: {
+            id: previewFor.id,
+            name: previewFor.name,
+            address: previewFor.address,
+            websiteUri: previewFor.websiteUri,
+            phone: previewFor.phone,
+            rating: previewFor.rating,
+            userRatingCount: previewFor.userRatingCount,
+            primaryType: previewFor.primaryType,
+            types: previewFor.types,
+            lat: previewFor.lat,
+            lng: previewFor.lng,
+          },
           query,
           location,
           filterNoWebsite,
@@ -701,31 +714,46 @@ export default function SearchClient({
     const nw = sp.get("nw") === "1";
       const actionType = sp.get("action") as "generate" | "publish" | null;
       const placeId = sp.get("placeId");
+      const resumePlaceRaw = sp.get("rp");
       const checkoutSuccess = sp.get("checkout") === "success";
       if (checkoutSuccess) setCheckoutUnlocked(true);
 
     // Strip the params so a manual refresh doesn't keep resuming.
     window.history.replaceState(null, "", "/");
 
-    if (!q) return;
-    setQuery(q);
-    setLocation(loc);
-    setFilterNoWebsite(nw);
+      if (q) {
+        setQuery(q);
+        setLocation(loc);
+        setFilterNoWebsite(nw);
+      }
 
-    (async () => {
-      const places = await runSearch({
-        query: q,
-        location: loc,
-        filterNoWebsite: nw,
-      });
-      if (!places || !actionType || !placeId) return;
-      // Only auto-run the pending action after a successful checkout return.
-      // Sign-in/OAuth resume should restore search context only.
-      if (!checkoutSuccess) return;
-      const place = places.find((p) => p.id === placeId);
-      if (!place) return;
-      if (actionType === "generate") {
-        generatePreview(place, false, checkoutSuccess);
+      let resumePlace: Place | null = null;
+      if (resumePlaceRaw) {
+        try {
+          resumePlace = JSON.parse(decodeURIComponent(resumePlaceRaw)) as Place;
+        } catch {
+          resumePlace = null;
+        }
+      }
+
+      (async () => {
+        const places = q
+          ? await runSearch({
+              query: q,
+              location: loc,
+              filterNoWebsite: nw,
+            })
+          : null;
+        if (!actionType || !placeId) return;
+        // Only auto-run the pending action after a successful checkout return.
+        // Sign-in/OAuth resume should restore search context only.
+        if (!checkoutSuccess) return;
+        const place =
+          places?.find((p) => p.id === placeId) ||
+          (resumePlace && resumePlace.id === placeId ? resumePlace : null);
+        if (!place) return;
+        if (actionType === "generate") {
+          generatePreview(place, false, checkoutSuccess);
       } else if (actionType === "publish") {
         copyWebsiteUrl(place);
       }
