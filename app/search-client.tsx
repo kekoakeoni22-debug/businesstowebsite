@@ -19,6 +19,35 @@ import {
 } from "@/lib/generate-site/prompt";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
+// Toggle to false to call the real Gemini API again. When true, every
+// Generate click streams an existing template from site_templates as if
+// it were being generated live, then pops the paywall modal.
+const MOCK_GENERATION = true;
+
+// Used when site_templates is empty so the mock-stream UI always has
+// something to show. Kept small so the first paint isn't ugly.
+const FALLBACK_MOCK_HTML = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{BUSINESS_NAME}}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #faf6f1; color: #2d241e; }
+    .hero { padding: 6rem 2rem 4rem; text-align: center; }
+    h1 { font-size: 3rem; margin: 0 0 1rem; }
+    .lead { color: #6b5c52; margin: 0 0 2rem; }
+    .cta { display: inline-block; padding: 0.9rem 1.6rem; background: #c9a66b; color: white; border-radius: 4px; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <section class="hero">
+    <h1>{{BUSINESS_NAME}}</h1>
+    <p class="lead">Crafted in your neighborhood. Stop by, say hi.</p>
+    <a class="cta" href="tel:{{PHONE}}">Call {{PHONE}}</a>
+  </section>
+</body>
+</html>`;
+
 type Place = {
   id: string;
   name: string;
@@ -252,6 +281,9 @@ export default function SearchClient({
   // Transient "Copied!" feedback on the per-card copy button. Holds the
   // place id of the most recently copied URL; cleared after a couple seconds.
   const [copiedFor, setCopiedFor] = useState<string | null>(null);
+
+  // Paywall modal — pops after the mock-stream finishes "generating".
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   const router = useRouter();
 
@@ -686,6 +718,63 @@ export default function SearchClient({
     return { extras, failures };
   }
 
+  // Mock generation: opens the preview overlay, fetches an existing HTML
+  // template from the site_templates table, and streams it chunk-by-chunk
+  // into streamingText so it reads like a real Gemini run. When the
+  // "stream" finishes, closes the preview and pops the paywall modal —
+  // the user never actually sees the rendered site without paying.
+  async function runMockGeneration(p: Place) {
+    previewAbortRef.current?.abort();
+    const ac = new AbortController();
+    previewAbortRef.current = ac;
+    setPreviewFor(p);
+    setPreviewHtml(null);
+    setPreviewError(null);
+    setPreviewLoading(true);
+    setStreamingText("");
+    setCurrentTemplate(null);
+    setPreviewModel("generating · gemini-3-flash-preview");
+
+    // Pull a template to stream. Prefer the matching primary_type so it
+    // feels appropriate to the business; fall back to any row in the
+    // table, then to the hardcoded sample if the table is empty.
+    const supabase = createSupabaseBrowserClient();
+    const primaryType = p.primaryType || "business";
+    let html: string | null = null;
+    const { data: matched } = await supabase
+      .from("site_templates")
+      .select("html_template")
+      .eq("primary_type", primaryType)
+      .maybeSingle();
+    if (matched?.html_template) {
+      html = matched.html_template;
+    } else {
+      const { data: anyRow } = await supabase
+        .from("site_templates")
+        .select("html_template")
+        .limit(1)
+        .maybeSingle();
+      html = anyRow?.html_template || FALLBACK_MOCK_HTML;
+    }
+
+    // Stream in ~60 chunks across ~6 seconds regardless of HTML length so
+    // the pacing feels consistent.
+    const TOTAL_MS = 6000;
+    const CHUNKS = 60;
+    const chunkSize = Math.max(1, Math.ceil(html.length / CHUNKS));
+    const delayMs = TOTAL_MS / CHUNKS;
+    for (let i = 0; i < html.length; i += chunkSize) {
+      if (ac.signal.aborted) return;
+      setStreamingText(html.slice(0, Math.min(html.length, i + chunkSize)));
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+    if (ac.signal.aborted) return;
+
+    // Done "generating". Close preview, show paywall.
+    closePreview();
+    setPaywallOpen(true);
+  }
+
   async function generatePreview(p: Place, forceRegenerate = false) {
     const info = businessInfoFromPlace(p);
     const primaryType = p.primaryType || "business";
@@ -699,6 +788,15 @@ export default function SearchClient({
     if (!user) {
       await new Promise((r) => setTimeout(r, 600));
       openSignInPrompt("generate", p);
+      return;
+    }
+
+    // Paywall mode: instead of calling Gemini (or even using the cached
+    // template), pretend to generate by streaming HTML from the database
+    // character-by-character, then pop the paywall. Flip MOCK_GENERATION
+    // off below to restore the real flow.
+    if (MOCK_GENERATION) {
+      await runMockGeneration(p);
       return;
     }
 
@@ -1604,6 +1702,74 @@ export default function SearchClient({
                 />
               </svg>
               Continue with Google
+            </button>
+          </div>
+        </div>
+      )}
+
+      {paywallOpen && (
+        <div
+          className="paywall-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Unlock your generated website"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPaywallOpen(false);
+          }}
+        >
+          <div className="paywall-modal">
+            <button
+              type="button"
+              className="signin-close"
+              onClick={() => setPaywallOpen(false)}
+              aria-label="Close"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
+            <div className="paywall-spark" aria-hidden="true">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 1.5l1.95 4.7L18.5 8l-4.55 1.8L12 14.5l-1.95-4.7L5.5 8l4.55-1.8L12 1.5z"
+                  fill="url(#paywall-grad)"
+                />
+                <defs>
+                  <linearGradient id="paywall-grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                    <stop offset="0" stopColor="#1a73e8" />
+                    <stop offset="1" stopColor="#8430ce" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <h3 className="paywall-title">Your website is ready</h3>
+            <p className="paywall-sub">
+              Subscribe to view your generated site, download the HTML, and
+              publish it under a custom URL.
+            </p>
+            <ul className="paywall-features">
+              <li>Unlimited generations</li>
+              <li>Real business photos &amp; map embeds</li>
+              <li>Publish to a shareable URL</li>
+              <li>Download the full HTML</li>
+            </ul>
+            <a
+              className="btn btn-primary paywall-cta"
+              href="https://buy.stripe.com/test_placeholder"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Subscribe — $19/month
+            </a>
+            <button
+              type="button"
+              className="btn-link paywall-dismiss"
+              onClick={() => setPaywallOpen(false)}
+            >
+              Maybe later
             </button>
           </div>
         </div>
