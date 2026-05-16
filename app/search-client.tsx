@@ -275,7 +275,6 @@ export default function SearchClient({
       phone: p.phone,
       rating: p.rating,
       userRatingCount: p.userRatingCount,
-      photos: p.photos,
       hours: p.hours,
       query: query,
     });

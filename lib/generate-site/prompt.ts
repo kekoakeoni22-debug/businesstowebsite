@@ -6,7 +6,6 @@ export type BusinessInfo = {
   phone?: string;
   rating?: number;
   userRatingCount?: number;
-  photos?: string[];
   hours?: string[];
   query?: string;
 };
@@ -54,12 +53,6 @@ export function buildPrompt(b: BusinessInfo): string {
       ? `${b.rating.toFixed(1)} stars${b.userRatingCount ? ` from ${b.userRatingCount} reviews` : ""}`
       : "no rating data";
 
-  const photos = (b.photos || []).filter(Boolean);
-  const hasPhotos = photos.length > 0;
-  const photoList = hasPhotos
-    ? photos.map((u, i) => `${i + 1}. ${u}`).join("\n")
-    : "(none)";
-
   const heroPhotoUrl = buildHeroPhotoUrl(b);
 
   const hours = (b.hours || []).filter(Boolean);
@@ -100,33 +93,19 @@ HERO PHOTO — use this exact URL, verbatim, as the hero background:
 
 ${heroPhotoUrl}
 
-Do not modify the URL. Do not generate any other LoremFlickr URLs anywhere on the page. Place the image with \`onerror="this.style.display='none'"\` and back the hero section with a tasteful CSS gradient underneath so the layout holds if the image fails to load. Add a dark linear-gradient overlay on top of the photo so headline text stays readable.
+Do not modify the URL. Place the image with \`onerror="this.style.display='none'"\` and back the hero section with a tasteful CSS gradient underneath so the layout holds if the image fails to load. Add a dark linear-gradient overlay on top of the photo so headline text stays readable.
 
-EVERY OTHER IMAGE
-${hasPhotos
-  ? `You have ${photos.length} real photo${photos.length === 1 ? "" : "s"} of this exact business from Google Maps. These are the ONLY images allowed elsewhere on the page. Use them in the gallery, the about image, feature cards, the contact section.
+EVERY OTHER SECTION
+No other photographic images anywhere on the page. Zero <img> tags outside the hero. Where you would normally use photos (gallery, about image, feature cards), use:
+- Inline-SVG illustrations and icons
+- Color-blocked sections backed by tasteful CSS gradients
+- Typographic blockquotes or large pull-quotes
+- Bold-icon + headline feature cards
 
-URLs in order (photo 1 is most representative):
-${photoList}
-
-Hard rules:
-- Use each business photo at least once before repeating.
-- \`loading="lazy"\` on every business photo.
-- \`onerror="this.style.display='none'"\` on every business photo.
-- Plausible alt text per photo.
-- A small "Photos: Google Maps" credit in the footer.
-- DO NOT generate any additional LoremFlickr URL anywhere outside the hero. NO. ZERO. Not even one.`
-  : `This listing has NO business photos. In that case the page has NO photographic images outside the hero. Replace what would have been a gallery with one of:
-- An inline-SVG illustrated feature section
-- A two-column "what we do" layout with bold icon + headline cards
-- A bold typographic block-quote section
-- A color-blocked services grid using CSS gradients and inline-SVG icons
-Choose whichever fits the business type. Do NOT generate any additional LoremFlickr URL. ONE stock photo total on the page, which is the hero.`}
-
-Counts: exactly 1 LoremFlickr URL anywhere in the output. ${hasPhotos ? `Plus ${photos.length} business photo URL${photos.length === 1 ? "" : "s"} used in the page.` : `No other photos.`} Count them before you finish.
+Count your <img> tags before you finish — there must be exactly 1, and it must point at the hero URL above.
 
 SECTIONS
-Sticky header (name as logo, nav: About / Services or Menu${hasPhotos ? " / Gallery" : ""} / Contact) → Hero with image, headline, subheadline, two CTAs (primary: \`tel:${b.phone || ""}\`) → About (2–3 paragraphs) → Services/Menu (3–6 cards with inline SVG icon + name + short description + optional price)${hasPhotos ? ` → Gallery using the ${photos.length} business photo${photos.length === 1 ? "" : "s"} above` : ""} → 1–2 review quotes → Contact + footer with phone link, address (Google Maps deep link), hours, copyright.
+Sticky header (name as logo, nav: About / Services or Menu / Contact) → Hero with image, headline, subheadline, two CTAs (primary: \`tel:${b.phone || ""}\`) → About (2–3 paragraphs) → Services/Menu (3–6 cards with inline SVG icon + name + short description + optional price) → 1–2 review quotes → Contact + footer with phone link, address (Google Maps deep link), hours, copyright.
 
 ACCESSIBILITY
 Descriptive alt text on every image. WCAG-AA color contrast. Semantic landmarks (<header>, <main>, <section>, <footer>).
