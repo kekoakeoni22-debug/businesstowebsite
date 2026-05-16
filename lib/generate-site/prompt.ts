@@ -240,7 +240,9 @@ export function fillTemplate(
     RATING: escapeHtml(rating),
     REVIEW_COUNT: escapeHtml(reviewCount),
     HOURS_LIST: buildHoursListHtml(b.hours || []),
-    HERO_PHOTO_URL: buildHeroPhotoUrl(b),
+    // Prefer the business's first real photo for the hero when available.
+    // Fall back to deterministic stock imagery when we don't have photos.
+    HERO_PHOTO_URL: extras.PHOTO_1 || buildHeroPhotoUrl(b),
     PHOTO_1: extras.PHOTO_1 || "",
     PHOTO_2: extras.PHOTO_2 || "",
     PHOTO_3: extras.PHOTO_3 || "",
