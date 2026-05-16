@@ -708,55 +708,14 @@ button {
   border: 1px solid #e6e8ec;
   background: #ffffff;
   box-shadow: 0 30px 90px rgba(15, 23, 42, 0.35);
-  padding: clamp(1.25rem, 2.8vw, 2rem);
+  padding: 0;
   color: #0a2540;
   font-family: "Inter", "Segoe UI", Arial, sans-serif;
 }
 
-.stripe-paywall-kicker {
-  margin: 0 0 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #635bff;
-}
-
-.stripe-paywall-title {
-  margin: 0;
-  font-size: clamp(1.45rem, 3vw, 2rem);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-}
-
-.stripe-paywall-sub {
-  margin: 0.85rem 0 1rem;
-  font-size: 0.95rem;
-  color: #425466;
-  line-height: 1.5;
-}
-
-.stripe-start-btn {
-  width: 100%;
-  min-height: 46px;
-  border: 0;
-  border-radius: 10px;
-  background: #635bff;
-  color: #fff;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.stripe-start-btn:disabled {
-  opacity: 0.7;
-  cursor: default;
-}
-
 .stripe-elements-wrap {
-  margin-top: 0.9rem;
-  border: 1px solid #e6e8ec;
-  border-radius: 12px;
+  border: 0;
+  border-radius: 18px;
   overflow: hidden;
 }
 

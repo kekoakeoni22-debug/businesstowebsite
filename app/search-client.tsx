@@ -585,6 +585,13 @@ export default function SearchClient({
     }
   }, [mockPreviewLocked]);
 
+  useEffect(() => {
+    if (!mockPreviewLocked || !previewFor) return;
+    if (checkoutStarted || checkoutLoading || checkoutClientSecret || checkoutError) return;
+    startCheckoutSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mockPreviewLocked, previewFor, checkoutStarted, checkoutLoading, checkoutClientSecret, checkoutError]);
+
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setSignInError(null);
@@ -1994,16 +2001,8 @@ export default function SearchClient({
         <div className="stripe-paywall-page" role="dialog" aria-modal="true" aria-label="Subscribe to access and generate websites">
           <div className="stripe-paywall-page-scrim" />
           <div className="stripe-paywall-page-modal">
-            <p className="stripe-paywall-kicker">Subscription required</p>
-            <h2 className="stripe-paywall-title">Subscribe to access and generate websites</h2>
-            <p className="stripe-paywall-sub">Secure checkout powered by Stripe Elements.</p>
-            {!checkoutStarted && (
-              <button type="button" className="stripe-start-btn" onClick={startCheckoutSession} disabled={checkoutLoading}>
-                {checkoutLoading ? "Loading..." : "Subscribe"}
-              </button>
-            )}
             <div className="stripe-elements-wrap">
-              {checkoutLoading && <div className="stripe-elements-status">Starting Stripe checkout session...</div>}
+              {checkoutLoading && <div className="stripe-elements-status"></div>}
               {checkoutError && <div className="stripe-elements-status stripe-elements-error">{checkoutError}</div>}
               {!checkoutLoading && checkoutStarted && !checkoutError && checkoutClientSecret && stripePromise && (
                 <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret: checkoutClientSecret }}>
