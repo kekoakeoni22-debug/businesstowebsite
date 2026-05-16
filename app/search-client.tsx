@@ -102,7 +102,7 @@ function injectMockPaywall(html: string, businessName: string): string {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    padding: 20px;
     font-family: "Segoe UI", Arial, Helvetica, sans-serif !important;
   }
   .btw-mock-paywall,
@@ -113,25 +113,45 @@ function injectMockPaywall(html: string, businessName: string): string {
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(circle at top, rgba(66, 133, 244, 0.18), transparent 42%),
-      rgba(15, 23, 42, 0.52);
-    backdrop-filter: blur(10px);
+      radial-gradient(circle at 15% 5%, rgba(26, 115, 232, 0.16), transparent 46%),
+      radial-gradient(circle at 85% 90%, rgba(26, 115, 232, 0.1), transparent 42%),
+      rgba(15, 23, 42, 0.28);
+    backdrop-filter: blur(4px);
   }
   .btw-mock-paywall__card {
     position: relative;
-    width: min(440px, 100%);
-    border-radius: 28px;
-    padding: 28px;
+    width: min(1020px, 96vw);
+    min-height: min(680px, 90vh);
+    border-radius: 16px;
+    padding: clamp(24px, 3vw, 40px);
     color: #0f172a;
-    background: rgba(255, 255, 255, 0.92);
-    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28);
-    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(248, 250, 252, 0.97);
+    box-shadow: 0 26px 70px rgba(15, 23, 42, 0.22);
+    border: 1px solid rgba(218, 220, 224, 0.95);
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: clamp(18px, 3vw, 38px);
+    align-items: stretch;
+  }
+  .btw-mock-paywall__content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .btw-mock-paywall__side {
+    border-left: 1px solid rgba(218, 220, 224, 0.9);
+    padding-left: clamp(16px, 2.6vw, 30px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: linear-gradient(180deg, rgba(232, 240, 254, 0.7), rgba(255, 255, 255, 0));
+    border-radius: 10px;
   }
   .btw-mock-paywall__eyebrow {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
+    padding: 7px 12px;
     border-radius: 999px;
     background: rgba(37, 99, 235, 0.1);
     color: #1d4ed8;
@@ -141,30 +161,30 @@ function injectMockPaywall(html: string, businessName: string): string {
     text-transform: uppercase;
   }
   .btw-mock-paywall__title {
-    margin: 18px 0 10px;
-    font-size: clamp(28px, 5vw, 38px);
-    line-height: 1.05;
+    margin: 14px 0 10px;
+    font-size: clamp(32px, 4.2vw, 50px);
+    line-height: 1.02;
     letter-spacing: -0.04em;
   }
   .btw-mock-paywall__sub {
-    margin: 0 0 18px;
+    margin: 0 0 22px;
     color: #475569;
-    font-size: 15px;
-    line-height: 1.6;
+    font-size: clamp(15px, 1.4vw, 18px);
+    line-height: 1.55;
   }
   .btw-mock-paywall__list {
     list-style: none;
     padding: 0;
-    margin: 0 0 22px;
+    margin: 0;
     display: grid;
-    gap: 10px;
+    gap: 12px;
   }
   .btw-mock-paywall__list li {
     display: flex;
     align-items: center;
     gap: 10px;
     color: #0f172a;
-    font-size: 14px;
+    font-size: 15px;
   }
   .btw-mock-paywall__tick {
     width: 20px;
@@ -181,6 +201,8 @@ function injectMockPaywall(html: string, businessName: string): string {
   .btw-mock-paywall__actions {
     display: grid;
     gap: 10px;
+    margin-top: auto;
+    padding-top: 10px;
   }
   .btw-mock-paywall__cta {
     display: inline-flex;
@@ -188,9 +210,9 @@ function injectMockPaywall(html: string, businessName: string): string {
     align-items: center;
     justify-content: center;
     width: 100%;
-    min-height: 60px;
-    border-radius: 14px;
-    font-size: 15px;
+    min-height: 84px;
+    border-radius: 12px;
+    font-size: 16px;
     font-weight: 600;
     text-decoration: none;
     border: 0;
@@ -198,29 +220,47 @@ function injectMockPaywall(html: string, businessName: string): string {
   }
   .btw-mock-paywall__cta {
     color: #fff;
-    background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 48%, #7c3aed 100%);
-    box-shadow: 0 18px 40px rgba(37, 99, 235, 0.28);
+    background: linear-gradient(135deg, #1a73e8 0%, #1765cc 100%);
+    box-shadow: 0 8px 18px rgba(26, 115, 232, 0.36);
   }
   .btw-mock-paywall__price {
-    font-size: 18px;
+    font-size: 30px;
     font-weight: 700;
     line-height: 1.1;
   }
   .btw-mock-paywall__billing {
-    margin-top: 4px;
-    font-size: 12px;
+    margin-top: 6px;
+    font-size: 13px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.82);
+    color: rgba(255, 255, 255, 0.9);
     line-height: 1.3;
   }
   @media (max-width: 640px) {
     .btw-mock-paywall {
-      padding: 16px;
-      align-items: end;
+      padding: 10px;
+      align-items: center;
     }
     .btw-mock-paywall__card {
-      padding: 22px 18px 18px;
-      border-radius: 22px;
+      width: 100%;
+      min-height: min(760px, 96vh);
+      padding: 20px 16px 16px;
+      border-radius: 12px;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    .btw-mock-paywall__side {
+      border-left: 0;
+      padding-left: 0;
+      border-top: 1px solid rgba(218, 220, 224, 0.9);
+      padding-top: 14px;
+      border-radius: 0;
+      background: transparent;
+    }
+    .btw-mock-paywall__title {
+      font-size: clamp(28px, 9vw, 38px);
+    }
+    .btw-mock-paywall__sub {
+      font-size: 15px;
     }
   }
 </style>`;
@@ -229,25 +269,29 @@ function injectMockPaywall(html: string, businessName: string): string {
 <div class="btw-mock-paywall" role="dialog" aria-modal="true" aria-label="Unlock website preview">
   <div class="btw-mock-paywall__scrim"></div>
   <div class="btw-mock-paywall__card">
-    <h2 class="btw-mock-paywall__title">Generate and publish as many business sites as you need</h2>
-    <p class="btw-mock-paywall__sub">
-      Generate more sites for other businesses, download the HTML, and publish each one under a shareable URL.
-    </p>
-    <ul class="btw-mock-paywall__list">
-      <li><span class="btw-mock-paywall__tick">✓</span>Generate unlimited sites across multiple businesses</li>
-      <li><span class="btw-mock-paywall__tick">✓</span>Reuse the workflow for every new lead you want to pitch</li>
-      <li><span class="btw-mock-paywall__tick">✓</span>Publish each finished site to a client-ready URL in one click</li>
-    </ul>
-    <div class="btw-mock-paywall__actions">
-      <a
-        class="btw-mock-paywall__cta"
-        href="https://buy.stripe.com/test_placeholder"
-        target="_blank"
-        rel="noreferrer"
-      >
-        <span class="btw-mock-paywall__price">$12.99</span>
-        <span class="btw-mock-paywall__billing">Charged monthly. Cancel anytime.</span>
-      </a>
+    <div class="btw-mock-paywall__content">
+      <h2 class="btw-mock-paywall__title">Generate and publish as many business sites as you need</h2>
+      <p class="btw-mock-paywall__sub">
+        Generate more sites for other businesses, download the HTML, and publish each one under a shareable URL.
+      </p>
+      <ul class="btw-mock-paywall__list">
+        <li><span class="btw-mock-paywall__tick">✓</span>Generate unlimited sites across multiple businesses</li>
+        <li><span class="btw-mock-paywall__tick">✓</span>Reuse the workflow for every new lead you want to pitch</li>
+        <li><span class="btw-mock-paywall__tick">✓</span>Publish each finished site to a client-ready URL in one click</li>
+      </ul>
+    </div>
+    <div class="btw-mock-paywall__side">
+      <div class="btw-mock-paywall__actions">
+        <a
+          class="btw-mock-paywall__cta"
+          href="https://buy.stripe.com/test_placeholder"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <span class="btw-mock-paywall__price">$12.99</span>
+          <span class="btw-mock-paywall__billing">Charged monthly. Cancel anytime.</span>
+        </a>
+      </div>
     </div>
   </div>
 </div>`;
