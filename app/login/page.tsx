@@ -30,7 +30,7 @@ export default async function LoginPage({
               />
             </svg>
           </span>
-          Business Finder
+          Business To Website AI
         </div>
         <p className="subtitle">Sign in to bring your own API keys.</p>
 

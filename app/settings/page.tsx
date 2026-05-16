@@ -51,7 +51,7 @@ export default async function SettingsPage({
               />
             </svg>
           </span>
-          Business Finder
+          Business To Website AI
         </Link>
         <div className="app-user">
           <span className="email muted">{user.email}</span>
