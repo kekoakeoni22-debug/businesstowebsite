@@ -662,10 +662,25 @@ export default function SearchClient({
       // CDN URLs expire. The map is a public Google Maps embed iframe.
       newTab.document.body.innerHTML =
         "<p style='font-family:sans-serif;padding:2rem'>Building your site…</p>";
+      const photoCount = (p.photos || []).length;
       const { extras, failures } = await buildPublishExtras(p);
+      const photoSuccess = (Object.keys(extras) as (keyof FillExtras)[]).filter(
+        (k) => k.startsWith("PHOTO_")
+      ).length;
       if (failures.length > 0) {
         // eslint-disable-next-line no-console
         console.warn("Photo-data failures while publishing:", failures);
+        // Surface failures inline so the user doesn't need DevTools open.
+        // eslint-disable-next-line no-alert
+        alert(
+          `${failures.length} of ${photoCount} photo(s) couldn't be embedded. The site will publish without them.\n\n` +
+            failures.join("\n")
+        );
+      } else if (photoCount > 0 && photoSuccess === 0) {
+        // eslint-disable-next-line no-alert
+        alert(
+          `Places API returned ${photoCount} photo reference(s) for this business, but none could be extracted. The published site will have no gallery.`
+        );
       }
       const html = fillTemplate(
         currentTemplate,
