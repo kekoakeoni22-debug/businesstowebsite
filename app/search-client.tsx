@@ -1860,7 +1860,7 @@ export default function SearchClient({
                   // its own internal navigation). allow-popups lets links
                   // open in new tabs.
                   sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-                  className="preview-iframe"
+                  className={`preview-iframe ${mockPreviewLocked ? "preview-iframe-locked" : ""}`}
                 />
               )}
             </div>

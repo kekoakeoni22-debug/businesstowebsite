@@ -683,6 +683,12 @@ button {
   background: #fff;
 }
 
+.preview-iframe-locked {
+  filter: blur(14px) saturate(0.75) brightness(0.72);
+  transform: scale(1.02);
+  transform-origin: center center;
+}
+
 .stripe-paywall-page {
   position: fixed;
   inset: 0;
