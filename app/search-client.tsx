@@ -10,7 +10,6 @@ import {
   useMap,
 } from "@vis.gl/react-google-maps";
 import {
-  buildTemplatePrompt,
   fillTemplate,
   GEMINI_MODEL_CHAIN,
   isQuotaOrAccessError,
@@ -144,12 +143,10 @@ function PanTo({ point }: { point: { lat: number; lng: number } | null }) {
 
 export default function SearchClient({
   mapsKey,
-  geminiKey,
   defaultLocation,
   defaultCoords,
 }: {
   mapsKey: string;
-  geminiKey: string | null;
   defaultLocation: string;
   defaultCoords: { lat: number; lng: number } | null;
 }) {
@@ -510,15 +507,9 @@ export default function SearchClient({
       }
     }
 
-    // No template yet (or forced) — generate one with Gemini, then save it.
-    if (!geminiKey) {
-      setPreviewError(
-        "No Gemini API key on file. Add one in Settings, then refresh."
-      );
-      setPreviewLoading(false);
-      return;
-    }
-
+    // No template yet (or forced) — generate one via the edge proxy. The
+    // Gemini key lives in GEMINI_API_KEY on the server; the browser never
+    // sees it.
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -528,30 +519,15 @@ export default function SearchClient({
       return;
     }
 
-    const prompt = buildTemplatePrompt(primaryType);
-    const requestBody = JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.85,
-        topP: 0.95,
-        maxOutputTokens: 32768,
-        responseMimeType: "text/plain",
-      },
-    });
-
     let lastErrorMsg = "Generation failed.";
 
     for (const model of GEMINI_MODEL_CHAIN) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(
-          geminiKey
-        )}`;
-
-        const r = await fetch(url, {
+        const r = await fetch("/api/generate-site", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: ac.signal,
-          body: requestBody,
+          body: JSON.stringify({ primaryType, model }),
         });
 
         if (!r.ok) {

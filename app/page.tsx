@@ -27,14 +27,11 @@ export default async function Home() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: row } = await supabase
-    .from("user_api_keys")
-    .select("google_maps_api_key, gemini_api_key")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const mapsKey: string | null = row?.google_maps_api_key ?? null;
-  const geminiKey: string | null = row?.gemini_api_key ?? null;
+  // The Maps JS embed runs in the browser, so the key has to be a NEXT_PUBLIC
+  // env var. The Gemini key stays server-side — it's only used by
+  // /api/generate-site (edge proxy) so it never reaches the browser.
+  const mapsKey: string | null =
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || null;
 
   return (
     <div className="app-shell">
@@ -52,7 +49,6 @@ export default async function Home() {
         </Link>
         <div className="app-user">
           <span className="email muted">{user.email}</span>
-          <Link href="/settings">Settings</Link>
           <form action="/auth/signout" method="post">
             <button className="btn-link" type="submit">Sign out</button>
           </form>
@@ -63,15 +59,15 @@ export default async function Home() {
         <main className="results-shell">
           <div className="banner info">
             <span>
-              You haven&apos;t added a Google Maps API key yet.{" "}
-              <Link href="/settings">Add one in Settings</Link> to start searching.
+              NEXT_PUBLIC_GOOGLE_MAPS_API_KEY isn&apos;t set on the server.
+              Add it to the Vercel project&apos;s environment variables and
+              redeploy.
             </span>
           </div>
         </main>
       ) : (
         <SearchClient
           mapsKey={mapsKey}
-          geminiKey={geminiKey}
           defaultLocation={defaultLocation}
           defaultCoords={defaultCoords}
         />

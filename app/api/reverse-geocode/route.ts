@@ -12,16 +12,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  const { data: row } = await supabase
-    .from("user_api_keys")
-    .select("google_maps_api_key")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  const apiKey = row?.google_maps_api_key;
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { city: null, error: "No API key on file." },
-      { status: 400 }
+      { error: "GOOGLE_MAPS_API_KEY is not set on the server." },
+      { status: 500 }
     );
   }
 

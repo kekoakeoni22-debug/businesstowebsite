@@ -32,7 +32,7 @@ export default async function LoginPage({
           </span>
           Business To Website AI
         </div>
-        <p className="subtitle">Sign in to bring your own API keys.</p>
+        <p className="subtitle">Sign in to start finding businesses.</p>
 
         {error && <div className="banner error">{error}</div>}
 
