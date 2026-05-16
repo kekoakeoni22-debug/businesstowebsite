@@ -17,6 +17,7 @@ import {
   type FillExtras,
 } from "@/lib/generate-site/prompt";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { sendMagicLink, signInWithGoogle } from "./login/actions";
 
 type Place = {
   id: string;
@@ -215,6 +216,42 @@ export default function SearchClient({
   // Transient "Copied!" feedback on the per-card copy button. Holds the
   // place id of the most recently copied URL; cleared after a couple seconds.
   const [copiedFor, setCopiedFor] = useState<string | null>(null);
+
+  // In-page sign-in popup. Triggered when an anonymous visitor clicks an
+  // action that requires auth (Generate website, Copy website URL).
+  // `signInPromptReason` is just for the headline copy in the modal.
+  const [signInPromptReason, setSignInPromptReason] = useState<
+    null | "generate" | "publish"
+  >(null);
+  const [magicLinkEmail, setMagicLinkEmail] = useState("");
+  const [magicLinkLoading, setMagicLinkLoading] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [magicLinkError, setMagicLinkError] = useState<string | null>(null);
+
+  function openSignInPrompt(reason: "generate" | "publish") {
+    setSignInPromptReason(reason);
+    setMagicLinkEmail("");
+    setMagicLinkSent(false);
+    setMagicLinkError(null);
+    setMagicLinkLoading(false);
+  }
+
+  function closeSignInPrompt() {
+    setSignInPromptReason(null);
+  }
+
+  async function handleMagicLinkSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setMagicLinkError(null);
+    setMagicLinkLoading(true);
+    const result = await sendMagicLink(magicLinkEmail, "/");
+    setMagicLinkLoading(false);
+    if (result.ok) {
+      setMagicLinkSent(true);
+    } else {
+      setMagicLinkError(result.error);
+    }
+  }
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -509,13 +546,13 @@ export default function SearchClient({
 
     // No template yet (or forced) — generate one via the edge proxy. This
     // is the gated step: the route requires auth because every call costs
-    // Gemini tokens. Anonymous visitors get bounced to /login here.
+    // Gemini tokens. Anonymous visitors see the in-page sign-in popup.
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
       closePreview();
-      window.location.href = "/login?next=/";
+      openSignInPrompt("generate");
       return;
     }
 
@@ -724,7 +761,7 @@ export default function SearchClient({
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      window.location.href = "/login?next=/";
+      openSignInPrompt("publish");
       return;
     }
     try {
@@ -1248,6 +1285,107 @@ export default function SearchClient({
       )}
         </div>
       </div>
+
+      {signInPromptReason && (
+        <div
+          className="signin-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Sign in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeSignInPrompt();
+          }}
+        >
+          <div className="signin-modal">
+            <button
+              type="button"
+              className="signin-close"
+              onClick={closeSignInPrompt}
+              aria-label="Close"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
+            <h3 className="signin-title">
+              {signInPromptReason === "publish"
+                ? "Sign in to publish"
+                : "Sign in to generate"}
+            </h3>
+            <p className="signin-sub">
+              {signInPromptReason === "publish"
+                ? "Create a free account so we can publish the website under your name."
+                : "Create a free account to design a website for this business with Gemini."}
+            </p>
+
+            {magicLinkSent ? (
+              <div className="signin-success">
+                <strong>Check your inbox.</strong> We sent a sign-in link to{" "}
+                <code>{magicLinkEmail}</code>. Click it to return here signed
+                in.
+              </div>
+            ) : (
+              <form onSubmit={handleMagicLinkSubmit} className="signin-form">
+                <label htmlFor="signin-email" className="signin-label">
+                  Email
+                </label>
+                <input
+                  id="signin-email"
+                  type="email"
+                  required
+                  autoFocus
+                  autoComplete="email"
+                  value={magicLinkEmail}
+                  onChange={(e) => setMagicLinkEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="signin-input"
+                  disabled={magicLinkLoading}
+                />
+                {magicLinkError && (
+                  <div className="signin-error">{magicLinkError}</div>
+                )}
+                <button
+                  type="submit"
+                  className="btn btn-primary signin-submit"
+                  disabled={magicLinkLoading}
+                >
+                  {magicLinkLoading ? "Sending…" : "Email me a sign-in link"}
+                </button>
+              </form>
+            )}
+
+            <div className="signin-divider"><span>or</span></div>
+
+            <form action={signInWithGoogle}>
+              <input type="hidden" name="next" value="/" />
+              <button className="btn-google signin-google" type="submit">
+                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                  <path
+                    fill="#4285F4"
+                    d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A9 9 0 0 0 9 18z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A9 9 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A9 9 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
+                  />
+                </svg>
+                Continue with Google
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
     </APIProvider>
   );

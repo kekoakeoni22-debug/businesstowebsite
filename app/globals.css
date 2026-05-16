@@ -827,6 +827,116 @@ button {
   .chrome-address { font-size: 0.72rem; padding: 0.3rem 0.55rem; }
 }
 
+/* ========== Sign-in modal ========== */
+.signin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(20, 22, 28, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.signin-modal {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  background: white;
+  border-radius: 16px;
+  padding: 2rem 1.75rem 1.75rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+.signin-close {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  background: transparent;
+  border: none;
+  color: var(--gm-text-secondary);
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.signin-close:hover { background: var(--gm-bg-hover); }
+.signin-title {
+  margin: 0 0 0.4rem;
+  font-size: 1.25rem;
+}
+.signin-sub {
+  margin: 0 0 1.25rem;
+  color: var(--gm-text-secondary);
+  font-size: 0.9rem;
+}
+.signin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.signin-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--gm-text-secondary);
+}
+.signin-input {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--gm-border);
+  border-radius: 8px;
+  font: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.signin-input:focus {
+  border-color: var(--gm-blue);
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+}
+.signin-submit {
+  margin-top: 0.25rem;
+  width: 100%;
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+}
+.signin-error {
+  color: #d93025;
+  font-size: 0.85rem;
+}
+.signin-success {
+  background: #e6f4ea;
+  color: #137333;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.signin-success code {
+  background: rgba(0,0,0,0.05);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+.signin-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+  color: var(--gm-text-tertiary);
+  font-size: 0.8rem;
+}
+.signin-divider::before,
+.signin-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--gm-border);
+}
+.signin-google {
+  width: 100%;
+}
+
 /* ========== Sell modal ========== */
 .sell-overlay {
   position: fixed;

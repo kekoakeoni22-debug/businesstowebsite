@@ -58,3 +58,33 @@ export async function signOut() {
   await supabase.auth.signOut();
   redirect("/login");
 }
+
+// Magic-link sign-in. Returns a plain object instead of redirecting so the
+// caller (a client modal) can render success/error state in place rather
+// than navigating away.
+export async function sendMagicLink(
+  email: string,
+  next: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmed = (email || "").trim();
+  if (!trimmed || !/.+@.+\..+/.test(trimmed)) {
+    return { ok: false, error: "Enter a valid email address." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const siteUrl = await getSiteUrl();
+  const safeNext = next && next.startsWith("/") ? next : "/";
+  const callback = new URL(`${siteUrl}/auth/callback`);
+  callback.searchParams.set("next", safeNext);
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email: trimmed,
+    options: {
+      emailRedirectTo: callback.toString(),
+      shouldCreateUser: true,
+    },
+  });
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
