@@ -17,20 +17,24 @@ export async function POST(req: Request) {
   const placeId = typeof body?.placeId === "string" ? body.placeId : "";
   const origin = new URL(req.url).origin;
   const returnUrl = process.env.STRIPE_SUCCESS_URL || `${origin}/?checkout=success`;
+  const cancelUrl = process.env.STRIPE_CANCEL_URL || `${origin}/?checkout=cancelled`;
 
   const stripe = new Stripe(secretKey);
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    ui_mode: "embedded" as any,
-    line_items: [{ price: priceId, quantity: 1 }],
-    return_url: returnUrl,
-    client_reference_id: placeId || undefined,
-    allow_promotion_codes: true,
-  });
-
-  if (!session.client_secret) return jsonError(500, "Stripe embedded session is missing client secret.");
-  return new Response(JSON.stringify({ clientSecret: session.client_secret }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: returnUrl,
+      cancel_url: cancelUrl,
+      client_reference_id: placeId || undefined,
+      allow_promotion_codes: true,
+    });
+    if (!session.url) return jsonError(500, "Stripe checkout session is missing redirect URL.");
+    return new Response(JSON.stringify({ redirectUrl: session.url }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err: any) {
+    return jsonError(500, err?.message || "Stripe failed to create checkout session.");
+  }
 }
