@@ -359,6 +359,21 @@ button {
   background: var(--gm-green-soft);
   color: var(--gm-green);
 }
+.badge.photos.has {
+  background: var(--gm-blue-soft);
+  color: var(--gm-blue);
+}
+.badge.photos.none {
+  background: var(--gm-bg-hover);
+  color: var(--gm-text-tertiary);
+}
+
+.result-badges {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 
 .result-rating {
   display: flex;

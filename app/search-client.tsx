@@ -533,9 +533,17 @@ export default function SearchClient({
                     )}
                     <div className="result-head">
                       <h2 className="result-name">{p.name}</h2>
-                      {!p.websiteUri && (
-                        <span className="badge no-website">No website</span>
-                      )}
+                      <div className="result-badges">
+                        {!p.websiteUri && (
+                          <span className="badge no-website">No website</span>
+                        )}
+                        <span
+                          className={`badge photos ${p.photos && p.photos.length > 0 ? "has" : "none"}`}
+                          title="Photos returned by Google Maps for this listing"
+                        >
+                          {p.photos?.length || 0} photo{(p.photos?.length || 0) === 1 ? "" : "s"}
+                        </span>
+                      </div>
                     </div>
                     {typeof p.rating === "number" && (
                       <div className="result-rating">
