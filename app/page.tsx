@@ -39,7 +39,7 @@ export default async function Home() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <Link href="/" className="app-brand" aria-label="Business To Website AI home">
+        <Link href="/" className="app-brand" aria-label="Business Finder home">
           <span className="app-brand-logo" aria-hidden="true">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path
@@ -48,7 +48,7 @@ export default async function Home() {
               />
             </svg>
           </span>
-          Business To Website AI
+          Business Finder
         </Link>
         <div className="app-user">
           <span className="email muted">{user.email}</span>

@@ -10,7 +10,7 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "Business To Website AI",
+  title: "Business Finder",
   description: "Find local businesses — optionally only those without a website.",
 };
 
