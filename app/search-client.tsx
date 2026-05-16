@@ -158,6 +158,10 @@ export default function SearchClient({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");
+  // The raw template (with {{PLACEHOLDER}} tokens) currently displayed in
+  // the iframe. Kept separately so we can re-fill it with a different
+  // business's data when the user clicks another result card.
+  const [currentTemplate, setCurrentTemplate] = useState<string | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
   const streamCodeRef = useRef<HTMLPreElement | null>(null);
 
@@ -248,6 +252,26 @@ export default function SearchClient({
       setActiveId(p.id);
       setPanTarget({ lat: p.lat, lng: p.lng });
     }
+    maybeSwapPreviewTo(p);
+  }
+
+  // If the preview overlay is open and the user clicks a different result,
+  // refill the current template with the new business's data — instant swap,
+  // no LLM call needed. Skipped while a fresh template is still streaming so
+  // we don't fight an in-flight generation.
+  function maybeSwapPreviewTo(p: Place) {
+    if (
+      !previewFor ||
+      !currentTemplate ||
+      previewLoading ||
+      p.id === previewFor.id
+    ) {
+      return;
+    }
+    const info = businessInfoFromPlace(p);
+    setPreviewFor(p);
+    setPreviewHtml(fillTemplate(currentTemplate, info));
+    setPreviewError(null);
   }
 
   function businessInfoFromPlace(p: Place): BusinessInfo {
@@ -274,6 +298,7 @@ export default function SearchClient({
     setPreviewError(null);
     setPreviewLoading(true);
     setStreamingText("");
+    setCurrentTemplate(null);
 
     const info = businessInfoFromPlace(p);
     const primaryType = p.primaryType || "business";
@@ -291,6 +316,7 @@ export default function SearchClient({
       if (cached?.html_template) {
         try {
           const filled = fillTemplate(cached.html_template, info);
+          setCurrentTemplate(cached.html_template);
           setPreviewHtml(filled);
           setPreviewModel(`template · ${cached.model || "saved"}`);
           setPreviewLoading(false);
@@ -428,6 +454,7 @@ export default function SearchClient({
         }
 
         const filled = fillTemplate(templateHtml, info);
+        setCurrentTemplate(templateHtml);
         setPreviewHtml(filled);
         setPreviewModel(`new · ${model}`);
         setStreamingText("");
@@ -463,6 +490,7 @@ export default function SearchClient({
     setPreviewError(null);
     setPreviewLoading(false);
     setStreamingText("");
+    setCurrentTemplate(null);
   }
 
   useEffect(() => {
@@ -493,6 +521,7 @@ export default function SearchClient({
     if (node) {
       node.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
+    maybeSwapPreviewTo(p);
   }
 
   return (
