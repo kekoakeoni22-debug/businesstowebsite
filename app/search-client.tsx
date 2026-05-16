@@ -170,6 +170,9 @@ export default function SearchClient({
     defaultLocation.length > 0
   );
   const [filterNoWebsite, setFilterNoWebsite] = useState(true);
+  const [filterHasPhone, setFilterHasPhone] = useState(false);
+  const [minRating, setMinRating] = useState(0);
+  const [minReviews, setMinReviews] = useState(0);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     defaultCoords
   );
@@ -260,13 +263,33 @@ export default function SearchClient({
     }
   }
 
+  // Client-side post-filters applied on top of whatever the server returned.
+  // (No-website filtering happens server-side so pagination can target enough
+  // matches; the rest filter the displayed list without changing what we
+  // fetched.)
+  const filteredResults = useMemo(() => {
+    return (results || []).filter((p) => {
+      if (filterHasPhone && !p.phone) return false;
+      if (minRating > 0 && (typeof p.rating !== "number" || p.rating < minRating)) {
+        return false;
+      }
+      if (
+        minReviews > 0 &&
+        (typeof p.userRatingCount !== "number" || p.userRatingCount < minReviews)
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [results, filterHasPhone, minRating, minReviews]);
+
   const placedResults = useMemo(
     () =>
-      (results || []).filter(
+      filteredResults.filter(
         (p): p is Place & { lat: number; lng: number } =>
           typeof p.lat === "number" && typeof p.lng === "number"
       ),
-    [results]
+    [filteredResults]
   );
 
   const points = useMemo(
@@ -837,7 +860,41 @@ export default function SearchClient({
                       onChange={(e) => setFilterNoWebsite(e.target.checked)}
                     />
                     <span className="chip-check"><CheckIcon /></span>
-                    No website only
+                    No website
+                  </label>
+                  <label className={`chip ${filterHasPhone ? "active" : ""}`}>
+                    <input
+                      type="checkbox"
+                      checked={filterHasPhone}
+                      onChange={(e) => setFilterHasPhone(e.target.checked)}
+                    />
+                    <span className="chip-check"><CheckIcon /></span>
+                    Has phone
+                  </label>
+                  <label className={`chip-select ${minRating > 0 ? "active" : ""}`}>
+                    Rating
+                    <select
+                      value={minRating}
+                      onChange={(e) => setMinRating(parseFloat(e.target.value))}
+                    >
+                      <option value={0}>Any</option>
+                      <option value={3.5}>3.5+</option>
+                      <option value={4}>4.0+</option>
+                      <option value={4.5}>4.5+</option>
+                    </select>
+                  </label>
+                  <label className={`chip-select ${minReviews > 0 ? "active" : ""}`}>
+                    Reviews
+                    <select
+                      value={minReviews}
+                      onChange={(e) => setMinReviews(parseInt(e.target.value, 10))}
+                    >
+                      <option value={0}>Any</option>
+                      <option value={10}>10+</option>
+                      <option value={50}>50+</option>
+                      <option value={100}>100+</option>
+                      <option value={500}>500+</option>
+                    </select>
                   </label>
                 </div>
               </form>
@@ -859,16 +916,15 @@ export default function SearchClient({
               </>
             )}
 
-            {!loading && results && results.length > 0 && (
+            {!loading && results && filteredResults.length > 0 && (
               <>
                 <p className="results-summary">
-                  Showing {results.length} result{results.length === 1 ? "" : "s"}
-                  {filterNoWebsite
-                    ? ` without a website · scanned ${totalBeforeFilter}`
-                    : ` · ${totalBeforeFilter} found`}
+                  Showing {filteredResults.length} of {results.length} result
+                  {results.length === 1 ? "" : "s"}
+                  {filterNoWebsite ? ` · scanned ${totalBeforeFilter}` : ""}
                   {pagesFetched > 1 ? ` (${pagesFetched} pages)` : ""}
                 </p>
-                {results.map((p) => (
+                {filteredResults.map((p) => (
                   <article
                     className={`result-card ${activeId === p.id ? "active" : ""}`}
                     key={p.id}
@@ -964,11 +1020,13 @@ export default function SearchClient({
               </>
             )}
 
-            {!loading && results && results.length === 0 && (
+            {!loading && results && filteredResults.length === 0 && (
               <div className="empty-state">
                 <div className="empty-title">No results</div>
-                {filterNoWebsite && totalBeforeFilter > 0
-                  ? `All ${totalBeforeFilter} place${totalBeforeFilter === 1 ? "" : "s"} we found already have a website. Toggle "No website only" off to see them.`
+                {results.length > 0
+                  ? `${results.length} place${results.length === 1 ? "" : "s"} matched your search but were excluded by the filters. Relax the rating, reviews, or "has phone" filter to see them.`
+                  : filterNoWebsite && totalBeforeFilter > 0
+                  ? `All ${totalBeforeFilter} place${totalBeforeFilter === 1 ? "" : "s"} we found already have a website. Toggle "No website" off to see them.`
                   : "Try a different query or location."}
               </div>
             )}
