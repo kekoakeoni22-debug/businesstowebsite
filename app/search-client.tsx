@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
 import {
   APIProvider,
   Map,
@@ -24,6 +26,8 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 // it were being generated live, then shows a locked state inside the
 // previewed HTML itself.
 const MOCK_GENERATION = true;
+const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 // Used when site_templates is empty so the mock-stream UI always has
 // something to show. Kept small so the first paint isn't ugly.
@@ -500,6 +504,8 @@ export default function SearchClient({
   // business's data when the user clicks another result card.
   const [currentTemplate, setCurrentTemplate] = useState<string | null>(null);
   const [mockPreviewLocked, setMockPreviewLocked] = useState(false);
+  const [checkoutClientSecret, setCheckoutClientSecret] = useState<string | null>(null);
+  const [checkoutStarted, setCheckoutStarted] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
@@ -545,8 +551,13 @@ export default function SearchClient({
 
   async function startCheckoutSession() {
     if (!previewFor) return;
+    if (!stripePublishableKey || !stripePromise) {
+      setCheckoutError("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is missing.");
+      return;
+    }
     setCheckoutLoading(true);
     setCheckoutError(null);
+    setCheckoutClientSecret(null);
     try {
       const r = await fetch("/api/checkout/session", {
         method: "POST",
@@ -555,8 +566,9 @@ export default function SearchClient({
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Unable to create Stripe checkout session.");
-      if (!data?.redirectUrl) throw new Error("Stripe session missing redirect URL.");
-      window.location.href = data.redirectUrl;
+      if (!data?.clientSecret) throw new Error("Stripe session missing client secret.");
+      setCheckoutClientSecret(data.clientSecret);
+      setCheckoutStarted(true);
     } catch (err: any) {
       setCheckoutError(err?.message || "Unable to start checkout.");
     } finally {
@@ -566,6 +578,8 @@ export default function SearchClient({
 
   useEffect(() => {
     if (!mockPreviewLocked) {
+      setCheckoutStarted(false);
+      setCheckoutClientSecret(null);
       setCheckoutLoading(false);
       setCheckoutError(null);
     }
@@ -1983,12 +1997,19 @@ export default function SearchClient({
             <p className="stripe-paywall-kicker">Subscription required</p>
             <h2 className="stripe-paywall-title">Subscribe to access and generate websites</h2>
             <p className="stripe-paywall-sub">Secure checkout powered by Stripe Elements.</p>
-            <button type="button" className="stripe-start-btn" onClick={startCheckoutSession} disabled={checkoutLoading}>
+            {!checkoutStarted && (
+              <button type="button" className="stripe-start-btn" onClick={startCheckoutSession} disabled={checkoutLoading}>
                 {checkoutLoading ? "Loading..." : "Subscribe"}
-            </button>
+              </button>
+            )}
             <div className="stripe-elements-wrap">
               {checkoutLoading && <div className="stripe-elements-status">Starting Stripe checkout session...</div>}
               {checkoutError && <div className="stripe-elements-status stripe-elements-error">{checkoutError}</div>}
+              {!checkoutLoading && checkoutStarted && !checkoutError && checkoutClientSecret && stripePromise && (
+                <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret: checkoutClientSecret }}>
+                  <EmbeddedCheckout />
+                </EmbeddedCheckoutProvider>
+              )}
             </div>
           </div>
         </div>
