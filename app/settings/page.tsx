@@ -40,111 +40,123 @@ export default async function SettingsPage({
   const geminiKey: string | null = row?.gemini_api_key ?? null;
 
   return (
-    <main className="container">
-      <nav className="topnav">
-        <Link href="/">← Search</Link>
-        <form action="/auth/signout" method="post">
-          <button className="link" type="submit">Sign out</button>
-        </form>
-      </nav>
+    <>
+      <header className="app-header">
+        <Link href="/" className="app-brand">
+          <span className="app-brand-logo" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"
+                fill="currentColor"
+              />
+            </svg>
+          </span>
+          Business Finder
+        </Link>
+        <div className="app-user">
+          <span className="email muted">{user.email}</span>
+          <Link href="/">Search</Link>
+          <form action="/auth/signout" method="post">
+            <button className="btn-link" type="submit">Sign out</button>
+          </form>
+        </div>
+      </header>
 
-      <h1>Settings</h1>
-      <p className="subtitle">
-        Bring your own keys. Each is stored in your private row in Supabase
-        (row-level security) and only ever used server-side.
-      </p>
-
-      {notice && <div className="notice">{notice}</div>}
-      {error && <div className="error">{error}</div>}
-
-      <section className="key-section">
-        <h2>Google Maps API key</h2>
-        <p className="muted">
-          Used for place search and city detection. Get one at{" "}
-          <a
-            href="https://mapsplatform.google.com/maps-demo-key/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            mapsplatform.google.com/maps-demo-key
-          </a>
-          . The key needs <strong>Places API (New)</strong> and{" "}
-          <strong>Geocoding API</strong> enabled.
+      <main className="settings-shell">
+        <h1>Settings</h1>
+        <p className="settings-intro">
+          Bring your own keys. Each is stored in your private row in Supabase
+          with row-level security and only used server-side when you search.
         </p>
 
-        {mapsKey && (
-          <div className="key-status">
-            <p className="result-meta">
-              <strong>Saved key:</strong> <code>{maskKey(mapsKey)}</code>
-            </p>
-            <form action={deleteGoogleMapsKey} style={{ marginTop: "0.5rem" }}>
-              <button className="danger" type="submit">Remove key</button>
-            </form>
-          </div>
+        {notice && <div className="banner success">{notice}</div>}
+        {error && <div className="banner error">{error}</div>}
+
+        <section className="key-section">
+          <h2>Google Maps API key</h2>
+          <p className="key-desc">
+            Used for place search and city detection. Get one at{" "}
+            <a
+              href="https://mapsplatform.google.com/maps-demo-key/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              mapsplatform.google.com/maps-demo-key
+            </a>
+            . Make sure <strong>Places API (New)</strong> and{" "}
+            <strong>Geocoding API</strong> are enabled.
+          </p>
+
+          {mapsKey && (
+            <div className="key-status">
+              <span>
+                Saved: <code>{maskKey(mapsKey)}</code>
+              </span>
+              <form action={deleteGoogleMapsKey}>
+                <button className="btn btn-danger" type="submit">Remove</button>
+              </form>
+            </div>
+          )}
+
+          <form action={saveGoogleMapsKey} className="key-form">
+            <input
+              name="apiKey"
+              type="password"
+              autoComplete="off"
+              placeholder={mapsKey ? "Replace with new key" : "AIza…"}
+              required
+            />
+            <button className="btn btn-primary" type="submit">
+              Save key
+            </button>
+          </form>
+        </section>
+
+        <section className="key-section">
+          <h2>Gemini API key</h2>
+          <p className="key-desc">
+            For AI-powered features. Get one at{" "}
+            <a
+              href="https://aistudio.google.com/app/api-keys"
+              target="_blank"
+              rel="noreferrer"
+            >
+              aistudio.google.com/app/api-keys
+            </a>
+            .
+          </p>
+
+          {geminiKey && (
+            <div className="key-status">
+              <span>
+                Saved: <code>{maskKey(geminiKey)}</code>
+              </span>
+              <form action={deleteGeminiKey}>
+                <button className="btn btn-danger" type="submit">Remove</button>
+              </form>
+            </div>
+          )}
+
+          <form action={saveGeminiKey} className="key-form">
+            <input
+              name="apiKey"
+              type="password"
+              autoComplete="off"
+              placeholder={geminiKey ? "Replace with new key" : "AIza…"}
+              required
+            />
+            <button className="btn btn-primary" type="submit">
+              Save key
+            </button>
+          </form>
+        </section>
+
+        {row?.updated_at && (
+          <p className="muted" style={{ marginTop: "1rem", fontSize: "0.85rem" }}>
+            Last updated {new Date(row.updated_at).toLocaleString()}
+          </p>
         )}
-
-        <form action={saveGoogleMapsKey} className="key-form">
-          <label htmlFor="mapsKey">
-            {mapsKey ? "Replace key" : "Add key"}
-          </label>
-          <input
-            id="mapsKey"
-            name="apiKey"
-            type="password"
-            autoComplete="off"
-            placeholder="AIza…"
-            required
-          />
-          <button className="primary" type="submit">Save Google Maps key</button>
-        </form>
-      </section>
-
-      <section className="key-section">
-        <h2>Gemini API key</h2>
-        <p className="muted">
-          For AI-powered features. Get one at{" "}
-          <a
-            href="https://aistudio.google.com/app/api-keys"
-            target="_blank"
-            rel="noreferrer"
-          >
-            aistudio.google.com/app/api-keys
-          </a>
-          .
-        </p>
-
-        {geminiKey && (
-          <div className="key-status">
-            <p className="result-meta">
-              <strong>Saved key:</strong> <code>{maskKey(geminiKey)}</code>
-            </p>
-            <form action={deleteGeminiKey} style={{ marginTop: "0.5rem" }}>
-              <button className="danger" type="submit">Remove key</button>
-            </form>
-          </div>
-        )}
-
-        <form action={saveGeminiKey} className="key-form">
-          <label htmlFor="geminiKey">
-            {geminiKey ? "Replace key" : "Add key"}
-          </label>
-          <input
-            id="geminiKey"
-            name="apiKey"
-            type="password"
-            autoComplete="off"
-            placeholder="AIza…"
-            required
-          />
-          <button className="primary" type="submit">Save Gemini key</button>
-        </form>
-      </section>
-
-      {row?.updated_at && (
-        <p className="muted" style={{ marginTop: "1rem" }}>
-          Last updated {new Date(row.updated_at).toLocaleString()}
-        </p>
-      )}
-    </main>
+      </main>
+    </>
   );
 }

@@ -19,31 +19,40 @@ export default async function Home() {
   const hasKey = Boolean(row?.google_maps_api_key);
 
   return (
-    <main className="container">
-      <nav className="topnav">
-        <span className="muted">{user.email || "Signed in"}</span>
-        <div className="topnav-right">
+    <>
+      <header className="app-header">
+        <Link href="/" className="app-brand" aria-label="Business Finder home">
+          <span className="app-brand-logo" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"
+                fill="currentColor"
+              />
+            </svg>
+          </span>
+          Business Finder
+        </Link>
+        <div className="app-user">
+          <span className="email muted">{user.email}</span>
           <Link href="/settings">Settings</Link>
           <form action="/auth/signout" method="post">
-            <button className="link" type="submit">Sign out</button>
+            <button className="btn-link" type="submit">Sign out</button>
           </form>
         </div>
-      </nav>
-
-      <h1>Business Finder</h1>
-      <p className="subtitle">
-        Search local businesses by category and city. By default, only shows
-        businesses that don&apos;t appear to have a website.
-      </p>
+      </header>
 
       {!hasKey ? (
-        <div className="notice">
-          You haven&apos;t added a Google Maps API key yet.{" "}
-          <Link href="/settings">Add one in Settings</Link> to start searching.
-        </div>
+        <main className="results-shell">
+          <div className="banner info">
+            <span>
+              You haven&apos;t added a Google Maps API key yet.{" "}
+              <Link href="/settings">Add one in Settings</Link> to start searching.
+            </span>
+          </div>
+        </main>
       ) : (
         <SearchClient />
       )}
-    </main>
+    </>
   );
 }

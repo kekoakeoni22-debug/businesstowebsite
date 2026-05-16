@@ -10,8 +10,7 @@ async function getSiteUrl() {
   // env var, then localhost.
   try {
     const h = await headers();
-    const host =
-      h.get("x-forwarded-host") || h.get("host") || null;
+    const host = h.get("x-forwarded-host") || h.get("host") || null;
     const proto =
       h.get("x-forwarded-proto") ||
       (host && host.startsWith("localhost") ? "http" : "https");
@@ -27,11 +26,11 @@ async function getSiteUrl() {
   return "http://localhost:3000";
 }
 
-export async function signInWithOAuth(provider: "google" | "github") {
+export async function signInWithGoogle() {
   const supabase = await createSupabaseServerClient();
   const siteUrl = await getSiteUrl();
   const { data, error } = await supabase.auth.signInWithOAuth({
-    provider,
+    provider: "google",
     options: {
       redirectTo: `${siteUrl}/auth/callback`,
     },
@@ -44,50 +43,6 @@ export async function signInWithOAuth(provider: "google" | "github") {
     redirect(data.url);
   }
   redirect("/login?error=oauth_no_url");
-}
-
-export async function signInWithGoogle() {
-  await signInWithOAuth("google");
-}
-
-export async function signInWithGitHub() {
-  await signInWithOAuth("github");
-}
-
-export async function signInWithEmail(formData: FormData) {
-  const email = String(formData.get("email") || "").trim();
-  const password = String(formData.get("password") || "");
-  if (!email || !password) {
-    redirect("/login?error=Missing+email+or+password");
-  }
-
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
-  }
-  redirect("/");
-}
-
-export async function signUpWithEmail(formData: FormData) {
-  const email = String(formData.get("email") || "").trim();
-  const password = String(formData.get("password") || "");
-  if (!email || !password) {
-    redirect("/login?error=Missing+email+or+password&mode=signup");
-  }
-
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { emailRedirectTo: `${await getSiteUrl()}/auth/callback` },
-  });
-  if (error) {
-    redirect(
-      `/login?error=${encodeURIComponent(error.message)}&mode=signup`
-    );
-  }
-  redirect("/login?notice=Check+your+email+to+confirm+your+account");
 }
 
 export async function signOut() {

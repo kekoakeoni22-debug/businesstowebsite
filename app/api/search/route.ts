@@ -10,6 +10,70 @@ type SearchBody = {
   coords?: { lat: number; lng: number };
 };
 
+// Google's Places API (New) Text Search caps at 20 results per page and 3 pages
+// total = 60 results. We page adaptively: when the no-website filter is on, we
+// keep fetching until we either hit the cap or have enough filtered results.
+const MAX_PAGES = 3;
+const TARGET_FILTERED = 20;
+
+const FIELD_MASK = [
+  "places.id",
+  "places.displayName",
+  "places.formattedAddress",
+  "places.websiteUri",
+  "places.nationalPhoneNumber",
+  "places.internationalPhoneNumber",
+  "places.rating",
+  "places.userRatingCount",
+  "places.primaryType",
+  "places.types",
+  "nextPageToken",
+].join(",");
+
+type Payload = {
+  textQuery: string;
+  pageSize: number;
+  pageToken?: string;
+  locationBias?: {
+    circle: { center: { latitude: number; longitude: number }; radius: number };
+  };
+};
+
+async function fetchPlacesPage(apiKey: string, payload: Payload) {
+  const resp = await fetch(
+    "https://places.googleapis.com/v1/places:searchText",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": FIELD_MASK,
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    let parsed: any = text;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      /* keep text */
+    }
+    const message =
+      parsed?.error?.message ||
+      (typeof parsed === "string" ? parsed : null) ||
+      `Places API error (HTTP ${resp.status}).`;
+    throw Object.assign(new Error(message), { status: resp.status });
+  }
+
+  return resp.json() as Promise<{
+    places?: any[];
+    nextPageToken?: string;
+  }>;
+}
+
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -53,13 +117,9 @@ export async function POST(req: Request) {
 
   const textQuery = location ? `${query} in ${location}` : query;
 
-  const payload: Record<string, unknown> = {
-    textQuery,
-    maxResultCount: 20,
-  };
-
+  const basePayload: Payload = { textQuery, pageSize: 20 };
   if (body.coords) {
-    payload.locationBias = {
+    basePayload.locationBias = {
       circle: {
         center: {
           latitude: body.coords.lat,
@@ -70,55 +130,39 @@ export async function POST(req: Request) {
     };
   }
 
-  const fieldMask = [
-    "places.id",
-    "places.displayName",
-    "places.formattedAddress",
-    "places.websiteUri",
-    "places.nationalPhoneNumber",
-    "places.internationalPhoneNumber",
-    "places.rating",
-    "places.userRatingCount",
-    "places.types",
-  ].join(",");
+  const collected: any[] = [];
+  let filteredCount = 0;
+  let pageToken: string | undefined;
+  let pagesFetched = 0;
 
-  let resp: Response;
   try {
-    resp = await fetch("https://places.googleapis.com/v1/places:searchText", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": fieldMask,
-      },
-      body: JSON.stringify(payload),
-    });
+    for (let i = 0; i < MAX_PAGES; i++) {
+      const payload: Payload = pageToken
+        ? { ...basePayload, pageToken }
+        : { ...basePayload };
+      const data = await fetchPlacesPage(apiKey, payload);
+      pagesFetched++;
+      const places = Array.isArray(data.places) ? data.places : [];
+      collected.push(...places);
+
+      if (filterNoWebsite) {
+        filteredCount += places.filter((p) => !p.websiteUri).length;
+      }
+
+      pageToken = data.nextPageToken;
+      if (!pageToken) break;
+      // Stop early when we don't need more pages.
+      if (!filterNoWebsite) break;
+      if (filteredCount >= TARGET_FILTERED) break;
+    }
   } catch (e: any) {
     return NextResponse.json(
-      { error: `Network error calling Places API: ${e.message || e}` },
-      { status: 502 }
+      { error: e.message || "Search failed" },
+      { status: e.status || 502 }
     );
   }
 
-  if (!resp.ok) {
-    const text = await resp.text();
-    let parsed: any = text;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      /* keep text */
-    }
-    const message =
-      parsed?.error?.message ||
-      (typeof parsed === "string" ? parsed : null) ||
-      `Places API error (HTTP ${resp.status}).`;
-    return NextResponse.json({ error: message }, { status: resp.status });
-  }
-
-  const data = await resp.json();
-  const rawPlaces: any[] = Array.isArray(data.places) ? data.places : [];
-
-  const allPlaces = rawPlaces.map((p) => ({
+  const allPlaces = collected.map((p) => ({
     id: p.id,
     name: p.displayName?.text || "(unnamed)",
     address: p.formattedAddress,
@@ -126,6 +170,7 @@ export async function POST(req: Request) {
     phone: p.nationalPhoneNumber || p.internationalPhoneNumber,
     rating: p.rating,
     userRatingCount: p.userRatingCount,
+    primaryType: p.primaryType,
     types: p.types,
   }));
 
@@ -136,5 +181,6 @@ export async function POST(req: Request) {
   return NextResponse.json({
     places: filtered,
     totalBeforeFilter: allPlaces.length,
+    pagesFetched,
   });
 }
