@@ -16,33 +16,26 @@ const STOPWORDS = new Set([
   "that", "what", "where", "when", "why", "how", "who", "around", "my",
 ]);
 
-// Build a LoremFlickr URL whose keywords come from the user's search query
-// plus the business primary type, with a deterministic per-business seed so
-// different businesses get different photos but the same business is stable.
+// Build a LoremFlickr URL that is fully determined by the business's name +
+// primary_type. The search query is intentionally NOT used, so the same
+// business gets the same photo regardless of how the user found it.
 export function buildHeroPhotoUrl(b: BusinessInfo): string {
-  const fromQuery = (b.query || "")
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((w) => w.length > 1 && !STOPWORDS.has(w));
+  const keywords =
+    (b.primaryType || "")
+      .toLowerCase()
+      .split("_")
+      .filter((w) => w.length > 1 && !STOPWORDS.has(w))
+      .slice(0, 3)
+      .join(",") || "storefront";
 
-  const fromType = (b.primaryType || "")
-    .toLowerCase()
-    .split("_")
-    .filter((w) => w.length > 1 && !STOPWORDS.has(w));
-
-  const merged: string[] = [];
-  for (const w of [...fromQuery, ...fromType]) {
-    if (!merged.includes(w)) merged.push(w);
-    if (merged.length >= 3) break;
-  }
-  const keywords = merged.length > 0 ? merged.join(",") : "storefront";
-
-  const seedSource = b.name || keywords;
-  let hash = 0;
+  // djb2-style hash for better distribution than a naive sum; same input
+  // always yields the same seed.
+  const seedSource = `${b.name || ""}|${b.primaryType || ""}`;
+  let hash = 5381;
   for (let i = 0; i < seedSource.length; i++) {
-    hash = (hash + seedSource.charCodeAt(i) * (i + 1)) % 9999;
+    hash = ((hash << 5) + hash + seedSource.charCodeAt(i)) & 0x7fffffff;
   }
-  const seed = hash + 1;
+  const seed = (hash % 9998) + 1;
 
   return `https://loremflickr.com/1600/900/${keywords}?lock=${seed}`;
 }
