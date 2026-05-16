@@ -40,6 +40,17 @@ function formatType(t?: string) {
   return t.replace(/_/g, " ");
 }
 
+// Strip protocol + leading www + trailing slash so the displayed link reads
+// cleanly (e.g. "tonys-pizza.com") while the href still points to the full URL.
+function prettyHostname(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./, "") + (u.pathname !== "/" ? u.pathname.replace(/\/$/, "") : "");
+  } catch {
+    return url;
+  }
+}
+
 function renderStars(rating: number) {
   const full = Math.floor(rating);
   const half = rating - full >= 0.5;
@@ -1048,6 +1059,19 @@ export default function SearchClient({
                         ) : null}
                       </div>
                     )}
+                    {p.websiteUri && (
+                      <div className="result-meta result-website">
+                        <GlobeIcon />
+                        <a
+                          href={p.websiteUri}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {prettyHostname(p.websiteUri)}
+                        </a>
+                      </div>
+                    )}
                     {p.primaryType && (
                       <div className="result-type">{formatType(p.primaryType)}</div>
                     )}
@@ -1092,16 +1116,6 @@ export default function SearchClient({
                           onClick={(e) => e.stopPropagation()}
                         >
                           <DirectionsIcon /> View on Maps
-                        </a>
-                      )}
-                      {p.websiteUri && (
-                        <a
-                          href={p.websiteUri}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <GlobeIcon /> Website
                         </a>
                       )}
                     </div>
