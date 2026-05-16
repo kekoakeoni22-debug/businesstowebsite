@@ -664,15 +664,7 @@ export default function SearchClient({
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (event.data?.type !== "close-mock-paywall") return;
-      previewAbortRef.current?.abort();
-      setPreviewFor(null);
-      setPreviewHtml(null);
-      setPreviewModel(null);
-      setPreviewError(null);
-      setPreviewLoading(false);
-      setStreamingText("");
-      setCurrentTemplate(null);
-      setMockPreviewLocked(false);
+      resetPreviewState();
     }
 
     window.addEventListener("message", onMessage);
@@ -812,15 +804,8 @@ export default function SearchClient({
     ) {
       return;
     }
-    const filled = fillTemplate(
-      currentTemplate,
-      businessInfoFromPlace(p),
-      buildPreviewExtras(p)
-    );
     setPreviewFor(p);
-    setPreviewHtml(
-      mockPreviewLocked ? injectMockPaywall(filled, p.name) : filled
-    );
+    setPreviewHtml(renderPreviewHtml(currentTemplate, p, { locked: mockPreviewLocked }));
     setPreviewError(null);
   }
 
@@ -836,6 +821,31 @@ export default function SearchClient({
       hours: p.hours,
       query: query,
     };
+  }
+
+  function renderPreviewHtml(
+    template: string,
+    p: Place,
+    options: { locked?: boolean } = {}
+  ) {
+    const filled = fillTemplate(
+      template,
+      businessInfoFromPlace(p),
+      buildPreviewExtras(p)
+    );
+    return options.locked ? injectMockPaywall(filled, p.name) : filled;
+  }
+
+  function resetPreviewState() {
+    previewAbortRef.current?.abort();
+    setPreviewFor(null);
+    setPreviewHtml(null);
+    setPreviewModel(null);
+    setPreviewError(null);
+    setPreviewLoading(false);
+    setStreamingText("");
+    setCurrentTemplate(null);
+    setMockPreviewLocked(false);
   }
 
   // Photo proxy URLs from the search API look like:
@@ -929,11 +939,9 @@ export default function SearchClient({
   // Mock generation: opens the preview overlay, fetches an existing HTML
   // template from the site_templates table, and streams it chunk-by-chunk
   // into streamingText so it reads like a real Gemini run. When the
-  // "stream" finishes, closes the preview and pops the paywall modal —
-  // the user never actually sees the rendered site without paying.
+  // "stream" finishes, the preview renders in a locked state inside
+  // the iframe itself.
   async function runMockGeneration(p: Place) {
-    // eslint-disable-next-line no-console
-    console.log("[paywall] runMockGeneration start", p.name);
     previewAbortRef.current?.abort();
     const ac = new AbortController();
     previewAbortRef.current = ac;
@@ -969,12 +977,15 @@ export default function SearchClient({
       html = fallback?.html_template || FALLBACK_MOCK_HTML;
     }
 
-    // Stream across ~22 seconds in ~110 chunks. Slower than a real Gemini
-    // run, but the pacing reads as "AI thinking" rather than "instant".
-    const TOTAL_MS = 22000;
+    // Wait a bit before the first bytes appear, then stream slowly enough
+    // that the mock generation feels deliberate rather than abrupt.
+    const INITIAL_DELAY_MS = 5000;
+    const TOTAL_MS = 32000;
     const CHUNKS = 110;
     const chunkSize = Math.max(1, Math.ceil(html.length / CHUNKS));
     const delayMs = TOTAL_MS / CHUNKS;
+    await new Promise((r) => setTimeout(r, INITIAL_DELAY_MS));
+    if (ac.signal.aborted) return;
     for (let i = 0; i < html.length; i += chunkSize) {
       if (ac.signal.aborted) return;
       setStreamingText(html.slice(0, Math.min(html.length, i + chunkSize)));
@@ -982,17 +993,8 @@ export default function SearchClient({
     }
     if (ac.signal.aborted) return;
 
-    // Done "generating". Keep the preview overlay open (so the streamed
-    // code stays visible behind the paywall) and pop the paywall on top.
-    // eslint-disable-next-line no-console
-    console.log("[paywall] stream done, opening paywall over preview");
-    const filled = fillTemplate(
-      html,
-      businessInfoFromPlace(p),
-      buildPreviewExtras(p)
-    );
     setCurrentTemplate(html);
-    setPreviewHtml(injectMockPaywall(filled, p.name));
+    setPreviewHtml(renderPreviewHtml(html, p, { locked: true }));
     setPreviewModel("preview locked · gemini-3-flash-preview");
     setStreamingText("");
     setPreviewLoading(false);
@@ -1000,7 +1002,6 @@ export default function SearchClient({
   }
 
   async function generatePreview(p: Place, forceRegenerate = false) {
-    const info = businessInfoFromPlace(p);
     const primaryType = p.primaryType || "business";
     const supabase = createSupabaseBrowserClient();
 
@@ -1017,8 +1018,8 @@ export default function SearchClient({
 
     // Paywall mode: instead of calling Gemini (or even using the cached
     // template), pretend to generate by streaming HTML from the database
-    // character-by-character, then pop the paywall. Flip MOCK_GENERATION
-    // off below to restore the real flow.
+    // character-by-character, then render the result in a locked iframe.
+    // Flip MOCK_GENERATION off below to restore the real flow.
     if (MOCK_GENERATION) {
       await runMockGeneration(p);
       return;
@@ -1034,11 +1035,6 @@ export default function SearchClient({
 
       if (cached?.html_template) {
         try {
-          const filled = fillTemplate(
-            cached.html_template,
-            info,
-            buildPreviewExtras(p)
-          );
           previewAbortRef.current?.abort();
           previewAbortRef.current = new AbortController();
           setPreviewFor(p);
@@ -1046,7 +1042,7 @@ export default function SearchClient({
           setStreamingText("");
           setCurrentTemplate(cached.html_template);
           setMockPreviewLocked(false);
-          setPreviewHtml(filled);
+          setPreviewHtml(renderPreviewHtml(cached.html_template, p));
           setPreviewModel(`template · ${cached.model || "saved"}`);
           setPreviewLoading(false);
           return;
@@ -1145,27 +1141,26 @@ export default function SearchClient({
         const fence = /^```(?:html)?\s*([\s\S]*?)\s*```$/i.exec(templateHtml);
         if (fence) templateHtml = fence[1].trim();
 
-        // Save the template for future reuse. The table is global (no
-        // user_id) so the cache benefits everyone, not just this user.
+        // Save the template to this signed-in user's per-type cache.
         const { error: saveErr } = await supabase
           .from("site_templates")
           .upsert(
             {
+              user_id: user.id,
               primary_type: primaryType,
               html_template: templateHtml,
               model,
             },
-            { onConflict: "primary_type" }
+            { onConflict: "user_id,primary_type" }
           );
         if (saveErr) {
           // eslint-disable-next-line no-console
           console.warn("Failed to save template:", saveErr.message);
         }
 
-        const filled = fillTemplate(templateHtml, info, buildPreviewExtras(p));
         setCurrentTemplate(templateHtml);
         setMockPreviewLocked(false);
-        setPreviewHtml(filled);
+        setPreviewHtml(renderPreviewHtml(templateHtml, p));
         setPreviewModel(`new · ${model}`);
         setStreamingText("");
         setPreviewLoading(false);
@@ -1193,15 +1188,7 @@ export default function SearchClient({
   }, [streamingText]);
 
   function closePreview() {
-    previewAbortRef.current?.abort();
-    setPreviewFor(null);
-    setPreviewHtml(null);
-    setPreviewModel(null);
-    setPreviewError(null);
-    setPreviewLoading(false);
-    setStreamingText("");
-    setCurrentTemplate(null);
-    setMockPreviewLocked(false);
+    resetPreviewState();
   }
 
 
