@@ -588,23 +588,13 @@ export default function SearchClient({
   }
 
   async function generatePreview(p: Place, forceRegenerate = false) {
-    previewAbortRef.current?.abort();
-    const ac = new AbortController();
-    previewAbortRef.current = ac;
-    setPreviewFor(p);
-    setPreviewHtml(null);
-    setPreviewModel(null);
-    setPreviewError(null);
-    setPreviewLoading(true);
-    setStreamingText("");
-    setCurrentTemplate(null);
-
     const info = businessInfoFromPlace(p);
     const primaryType = p.primaryType || "business";
-
     const supabase = createSupabaseBrowserClient();
 
-    // Try the cached template first unless the user asked for a regenerate.
+    // Cache lookup happens BEFORE we open the preview overlay so anonymous
+    // users who hit a cached template see the preview directly, and users
+    // who'll be bounced to sign-in never see the empty preview flash open.
     if (!forceRegenerate) {
       const { data: cached } = await supabase
         .from("site_templates")
@@ -619,6 +609,11 @@ export default function SearchClient({
             info,
             buildPreviewExtras(p)
           );
+          previewAbortRef.current?.abort();
+          previewAbortRef.current = new AbortController();
+          setPreviewFor(p);
+          setPreviewError(null);
+          setStreamingText("");
           setCurrentTemplate(cached.html_template);
           setPreviewHtml(filled);
           setPreviewModel(`template · ${cached.model || "saved"}`);
@@ -633,17 +628,30 @@ export default function SearchClient({
       }
     }
 
-    // No template yet (or forced) — generate one via the edge proxy. This
-    // is the gated step: the route requires auth because every call costs
-    // Gemini tokens. Anonymous visitors see the in-page sign-in popup.
+    // No cached template (or user forced a regenerate) — Gemini call is
+    // needed and that requires auth. Show the sign-in popup directly for
+    // anonymous visitors, with a small delay so it doesn't snap up.
+    // Critically, we do NOT open the preview overlay first.
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      closePreview();
+      await new Promise((r) => setTimeout(r, 600));
       openSignInPrompt("generate");
       return;
     }
+
+    // Authenticated: now it's safe to open the preview and start streaming.
+    previewAbortRef.current?.abort();
+    const ac = new AbortController();
+    previewAbortRef.current = ac;
+    setPreviewFor(p);
+    setPreviewHtml(null);
+    setPreviewModel(null);
+    setPreviewError(null);
+    setPreviewLoading(true);
+    setStreamingText("");
+    setCurrentTemplate(null);
 
     let lastErrorMsg = "Generation failed.";
 
@@ -850,6 +858,7 @@ export default function SearchClient({
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
+      await new Promise((r) => setTimeout(r, 600));
       openSignInPrompt("publish");
       return;
     }
