@@ -4,7 +4,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-type ProviderColumn = "google_maps_api_key" | "gemini_api_key";
+type ProviderColumn =
+  | "google_maps_api_key"
+  | "gemini_api_key"
+  | "unsplash_access_key";
 
 async function upsertKey(column: ProviderColumn, value: string) {
   const supabase = await createSupabaseServerClient();
@@ -72,4 +75,18 @@ export async function saveGeminiKey(formData: FormData) {
 export async function deleteGeminiKey() {
   await clearKey("gemini_api_key");
   redirect("/settings?notice=Gemini+key+removed");
+}
+
+export async function saveUnsplashKey(formData: FormData) {
+  const key = String(formData.get("apiKey") || "").trim();
+  if (!key) {
+    redirect("/settings?error=Unsplash+key+cannot+be+empty");
+  }
+  await upsertKey("unsplash_access_key", key);
+  redirect("/settings?notice=Unsplash+key+saved");
+}
+
+export async function deleteUnsplashKey() {
+  await clearKey("unsplash_access_key");
+  redirect("/settings?notice=Unsplash+key+removed");
 }

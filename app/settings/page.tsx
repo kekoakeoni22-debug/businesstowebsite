@@ -6,6 +6,8 @@ import {
   deleteGoogleMapsKey,
   saveGeminiKey,
   deleteGeminiKey,
+  saveUnsplashKey,
+  deleteUnsplashKey,
 } from "./actions";
 
 type SearchParams = { [key: string]: string | string[] | undefined };
@@ -28,7 +30,7 @@ export default async function SettingsPage({
 
   const { data: row } = await supabase
     .from("user_api_keys")
-    .select("google_maps_api_key, gemini_api_key, updated_at")
+    .select("google_maps_api_key, gemini_api_key, unsplash_access_key, updated_at")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -38,6 +40,7 @@ export default async function SettingsPage({
 
   const mapsKey: string | null = row?.google_maps_api_key ?? null;
   const geminiKey: string | null = row?.gemini_api_key ?? null;
+  const unsplashKey: string | null = row?.unsplash_access_key ?? null;
 
   return (
     <>
@@ -143,6 +146,47 @@ export default async function SettingsPage({
               type="password"
               autoComplete="off"
               placeholder={geminiKey ? "Replace with new key" : "AIza…"}
+              required
+            />
+            <button className="btn btn-primary" type="submit">
+              Save key
+            </button>
+          </form>
+        </section>
+
+        <section className="key-section">
+          <h2>Unsplash Access Key</h2>
+          <p className="key-desc">
+            Optional. When set, hero photos come from Unsplash search instead
+            of the default LoremFlickr fallback. Get a free Access Key at{" "}
+            <a
+              href="https://unsplash.com/developers"
+              target="_blank"
+              rel="noreferrer"
+            >
+              unsplash.com/developers
+            </a>{" "}
+            (create a "demo" app — free tier is 50 requests/hour, which is
+            plenty for browsing).
+          </p>
+
+          {unsplashKey && (
+            <div className="key-status">
+              <span>
+                Saved: <code>{maskKey(unsplashKey)}</code>
+              </span>
+              <form action={deleteUnsplashKey}>
+                <button className="btn btn-danger" type="submit">Remove</button>
+              </form>
+            </div>
+          )}
+
+          <form action={saveUnsplashKey} className="key-form">
+            <input
+              name="apiKey"
+              type="password"
+              autoComplete="off"
+              placeholder={unsplashKey ? "Replace with new key" : "Access Key…"}
               required
             />
             <button className="btn btn-primary" type="submit">

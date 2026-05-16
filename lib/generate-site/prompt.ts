@@ -21,6 +21,11 @@ export type FillExtras = {
   PHOTO_5?: string;
   PHOTO_6?: string;
   MAP_IMAGE?: string;
+  // Override the default hero URL. When the user has an Unsplash key
+  // configured, the client builds an Unsplash-backed URL and passes it here;
+  // otherwise we fall back to the deterministic LoremFlickr URL from
+  // buildHeroPhotoUrl().
+  HERO_PHOTO_URL?: string;
 };
 
 const STOPWORDS = new Set([
@@ -227,7 +232,7 @@ export function fillTemplate(
     RATING: escapeHtml(rating),
     REVIEW_COUNT: escapeHtml(reviewCount),
     HOURS_LIST: buildHoursListHtml(b.hours || []),
-    HERO_PHOTO_URL: buildHeroPhotoUrl(b),
+    HERO_PHOTO_URL: extras.HERO_PHOTO_URL || buildHeroPhotoUrl(b),
     PHOTO_1: extras.PHOTO_1 || "",
     PHOTO_2: extras.PHOTO_2 || "",
     PHOTO_3: extras.PHOTO_3 || "",
