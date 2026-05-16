@@ -59,11 +59,31 @@ HARD REQUIREMENTS
 - Use inline SVGs for icons — do not link any external icon CDN.
 - Include subtle animations: fade-in on scroll, hover lifts on cards, transform transitions. Keep them tasteful, not distracting.
 
-STOCK PHOTOS (USE WHEN APPROPRIATE)
-- Source: \`https://source.unsplash.com/featured/<width>x<height>/?<comma-separated-keywords>\` — this redirects to a curated Unsplash photo matching the keywords.
-- Pick keywords that match the business type (e.g. "restaurant,interior,warm" for a cafe; "salon,hairdresser,minimal" for a salon; "construction,worker,industrial" for a contractor).
-- Use 1 large hero image, plus 2–4 supporting images in a gallery or feature section. Use \`loading="lazy"\` for non-hero images. Use \`onerror="this.style.display='none'"\` so a failed image never breaks the layout.
-- If the business type is one where photos add little (e.g. lawyer, accountant), favor gradients, illustrations, and inline SVG illustrations over stock photos.
+HERO BACKGROUND IMAGE (REQUIRED)
+You MUST include a stock photo in the hero section that visually matches the business type. Use it as the hero background (with a dark gradient overlay so headline text stays readable), or as a large adjacent hero image. This is not optional.
+
+Image URL format (LoremFlickr — keyword-based, no API key, always works):
+  https://loremflickr.com/<width>/<height>/<keyword1>,<keyword2>,<keyword3>?lock=<positive integer>
+
+Examples by business type:
+- thai restaurant → \`https://loremflickr.com/1600/900/thai,restaurant,food?lock=7\`
+- coffee shop → \`https://loremflickr.com/1600/900/coffee,cafe,interior?lock=12\`
+- hair salon → \`https://loremflickr.com/1600/900/salon,hair,styling?lock=3\`
+- gym → \`https://loremflickr.com/1600/900/gym,fitness,weights?lock=9\`
+- plumber → \`https://loremflickr.com/1600/900/plumbing,tools,pipes?lock=5\`
+- bakery → \`https://loremflickr.com/1600/900/bakery,bread,pastry?lock=2\`
+
+Rules for keyword selection:
+- 2 to 4 comma-separated keywords, lowercase, no spaces.
+- Lead with the most specific keyword for the business type, then a more generic one (e.g. \`pizza,restaurant\` not \`food,italian\`).
+- For service businesses without obvious photo subjects (lawyer, accountant, consulting), still include a relevant photo using \`office,professional,modern\` or \`handshake,business\`.
+
+Always set the image with \`onerror\` to fall back to a CSS gradient so a transient image failure never produces a broken hero:
+  <img onerror="this.style.display='none'" ... />
+and back the hero section with a tasteful gradient color so the layout holds without the photo.
+
+ADDITIONAL STOCK PHOTOS
+Add 2–4 more LoremFlickr images in a gallery or feature section, each with different keywords pulled from the business. Use \`loading="lazy"\` on these and the same \`onerror\` fallback.
 
 SECTIONS
 Sticky header (name as logo, nav: About / Services or Menu / Gallery / Contact) → Hero with image, headline, subheadline, two CTAs (primary: \`tel:${b.phone || ""}\`) → About (2–3 paragraphs) → Services/Menu (3–6 cards with inline SVG icon + name + short description + optional price) → Gallery (3–6 images) → 1–2 review quotes → Contact + footer with phone link, address (Google Maps deep link), hours, copyright.
