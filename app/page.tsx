@@ -16,10 +16,10 @@ export default async function Home() {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  const hasKey = Boolean(row?.google_maps_api_key);
+  const mapsKey: string | null = row?.google_maps_api_key ?? null;
 
   return (
-    <>
+    <div className="app-shell">
       <header className="app-header">
         <Link href="/" className="app-brand" aria-label="Business Finder home">
           <span className="app-brand-logo" aria-hidden="true">
@@ -41,7 +41,7 @@ export default async function Home() {
         </div>
       </header>
 
-      {!hasKey ? (
+      {!mapsKey ? (
         <main className="results-shell">
           <div className="banner info">
             <span>
@@ -51,8 +51,8 @@ export default async function Home() {
           </div>
         </main>
       ) : (
-        <SearchClient />
+        <SearchClient mapsKey={mapsKey} />
       )}
-    </>
+    </div>
   );
 }

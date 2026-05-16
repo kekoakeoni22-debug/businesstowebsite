@@ -27,6 +27,7 @@ const FIELD_MASK = [
   "places.userRatingCount",
   "places.primaryType",
   "places.types",
+  "places.location",
   "nextPageToken",
 ].join(",");
 
@@ -172,6 +173,14 @@ export async function POST(req: Request) {
     userRatingCount: p.userRatingCount,
     primaryType: p.primaryType,
     types: p.types,
+    lat:
+      typeof p.location?.latitude === "number"
+        ? p.location.latitude
+        : undefined,
+    lng:
+      typeof p.location?.longitude === "number"
+        ? p.location.longitude
+        : undefined,
   }));
 
   const filtered = filterNoWebsite
