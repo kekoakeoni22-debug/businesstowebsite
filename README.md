@@ -36,11 +36,11 @@ Set these in `.env.local` for dev and in **Vercel → Project Settings → Envir
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase client | public |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase client | public |
 | `NEXT_PUBLIC_SITE_URL` | OAuth redirect builder | public |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Maps JS embed in the browser | public |
-| `GOOGLE_MAPS_API_KEY` | `/api/search`, `/api/photo`, `/api/photo-data`, `/api/reverse-geocode` | **server only** |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Maps JS embed in the browser; server falls back to it for Places / photos / geocoding | public |
+| `GOOGLE_MAPS_API_KEY` | **Optional.** Server-only override for Places / photos / geocoding when you want a separate, unrestricted key | server only |
 | `GEMINI_API_KEY` | `/api/generate-site` (edge proxy) | **server only** |
 
-`NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_API_KEY` can be the same key, or you can split them (browser-restricted vs. server-only) for tighter security. Whichever key you use for the public one **must** be restricted by HTTP referrer in Google Cloud Console.
+A single `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is enough — the server reads it too. Add `GOOGLE_MAPS_API_KEY` only if you want a referrer-restricted public key + a separate server key. Restrict the public key by HTTP referrer in Google Cloud Console (Maps JS API only) so other sites can't reuse it.
 
 The Google Maps key needs **Places API (New)** and **Geocoding API** (and **Maps JavaScript API** for the public one). Photos require the Pro SKU tier of Text Search.
 

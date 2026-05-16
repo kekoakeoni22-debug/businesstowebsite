@@ -16,9 +16,11 @@ export async function GET(
   } = await supabase.auth.getUser();
   if (!user) return new Response("Not signed in", { status: 401 });
 
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const apiKey =
+    process.env.GOOGLE_MAPS_API_KEY ||
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
-    return new Response("GOOGLE_MAPS_API_KEY is not set on the server", {
+    return new Response("No Google Maps API key configured on the server", {
       status: 500,
     });
   }

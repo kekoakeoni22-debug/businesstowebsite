@@ -117,10 +117,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const apiKey =
+    process.env.GOOGLE_MAPS_API_KEY ||
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "GOOGLE_MAPS_API_KEY is not set on the server." },
+      { error: "No Google Maps API key configured on the server." },
       { status: 500 }
     );
   }
