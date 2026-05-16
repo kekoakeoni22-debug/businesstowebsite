@@ -16,7 +16,6 @@ a {
   color: #2563eb;
   text-decoration: none;
 }
-
 a:hover {
   text-decoration: underline;
 }
@@ -36,6 +35,19 @@ h1 {
   color: #555;
   margin: 0 0 1.5rem;
   font-size: 0.95rem;
+}
+
+.topnav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
+}
+.topnav-right {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
 }
 
 .controls {
@@ -62,7 +74,9 @@ h1 {
   color: #374151;
 }
 
-.field input[type="text"] {
+.field input[type="text"],
+.field input[type="email"],
+.field input[type="password"] {
   border: 1px solid #d1d5db;
   border-radius: 8px;
   padding: 0.55rem 0.7rem;
@@ -72,7 +86,7 @@ h1 {
   width: 100%;
 }
 
-.field input[type="text"]:focus {
+.field input:focus {
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
@@ -88,10 +102,34 @@ button.primary {
   cursor: pointer;
   height: fit-content;
 }
-
 button.primary:disabled {
   background: #9ca3af;
   cursor: not-allowed;
+}
+
+button.link {
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+button.link:hover {
+  text-decoration: underline;
+}
+
+button.danger {
+  background: #fff;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+button.danger:hover {
+  background: #fef2f2;
 }
 
 .filter-row {
@@ -102,7 +140,6 @@ button.primary:disabled {
   font-size: 0.9rem;
   color: #374151;
 }
-
 .filter-row input[type="checkbox"] {
   width: 16px;
   height: 16px;
@@ -156,9 +193,165 @@ button.primary:disabled {
   font-size: 0.9rem;
 }
 
+.notice {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+
 .muted {
   color: #6b7280;
   font-size: 0.9rem;
+}
+
+/* Auth page */
+.auth-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+.auth-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.auth-card h1 {
+  margin-bottom: 0.35rem;
+}
+.auth-card .subtitle {
+  margin-bottom: 1.5rem;
+}
+
+button.oauth {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 0.6rem;
+  color: #1a1a1a;
+}
+button.oauth:hover {
+  background: #f9fafb;
+}
+button.oauth.github {
+  background: #24292f;
+  border-color: #24292f;
+  color: #fff;
+}
+button.oauth.github:hover {
+  background: #1b1f24;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 1rem 0;
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+.divider span {
+  padding: 0 0.6rem;
+}
+
+.email-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.email-form label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+  margin-top: 0.4rem;
+}
+.email-form input {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.95rem;
+  background: #fff;
+  outline: none;
+}
+.email-form input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.email-form button {
+  margin-top: 0.7rem;
+}
+
+.auth-switch {
+  text-align: center;
+  font-size: 0.88rem;
+  color: #6b7280;
+  margin-top: 1rem;
+}
+
+/* Settings */
+.key-status {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  margin: 0.75rem 0 1rem;
+}
+.key-status code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: #f3f4f6;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.key-form {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.key-form label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+}
+.key-form input {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.95rem;
+  background: #fff;
+  outline: none;
+}
+.key-form input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.key-form button {
+  align-self: flex-start;
+  margin-top: 0.3rem;
 }
 
 @media (max-width: 640px) {

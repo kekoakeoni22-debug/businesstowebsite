@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -10,11 +11,28 @@ type SearchBody = {
 };
 
 export async function POST(req: Request) {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
+
+  const { data: row, error: keyErr } = await supabase
+    .from("user_api_keys")
+    .select("google_maps_api_key")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (keyErr) {
+    return NextResponse.json({ error: keyErr.message }, { status: 500 });
+  }
+  const apiKey = row?.google_maps_api_key;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "Server is missing GOOGLE_MAPS_API_KEY." },
-      { status: 500 }
+      { error: "No Google Maps API key on file. Add one in Settings." },
+      { status: 400 }
     );
   }
 

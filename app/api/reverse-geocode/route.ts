@@ -1,13 +1,27 @@
 import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
+
+  const { data: row } = await supabase
+    .from("user_api_keys")
+    .select("google_maps_api_key")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const apiKey = row?.google_maps_api_key;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "Server is missing GOOGLE_MAPS_API_KEY." },
-      { status: 500 }
+      { city: null, error: "No API key on file." },
+      { status: 400 }
     );
   }
 

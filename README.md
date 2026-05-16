@@ -2,55 +2,77 @@
 
 Next.js app that searches local businesses via the Google Maps **Places API (New)** and, by default, filters out any place that already has a website.
 
-## How it works
+- **Auth**: Supabase Auth — sign in with Google, GitHub, or email/password.
+- **BYO API key**: Each user enters their own Google Maps API key on `/settings`. It's stored in their private row in a `user_api_keys` table protected by row-level security and only used server-side at search time.
 
-- The browser asks for geolocation on load → reverse-geocodes to a city name and pre-fills the location input.
-- "Search" calls the server route `/api/search`, which forwards a `places:searchText` request to Google. The API key stays on the server.
-- Each result includes a `websiteUri` (or doesn't). The server filters those out when the "without a website" checkbox is checked (default: on).
+## 1. Create the Supabase project
 
-## Setup
+1. Go to <https://app.supabase.com> → **New project**.
+2. After it provisions, open **Project Settings → API Keys**. Copy:
+   - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
+   - **Publishable key** (starts with `sb_publishable_…`) → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
-### 1. Enable Google APIs
+   > This is the new key format Supabase rolled out in 2025. Legacy `anon` keys still work through end of 2026, but new projects should use the publishable key. (See [Supabase: Understanding API keys](https://supabase.com/docs/guides/api/api-keys).)
+3. Open **SQL Editor**, paste the contents of `supabase/migrations/0001_user_api_keys.sql`, and run it. This creates the `user_api_keys` table with RLS so a user can only read/write their own row.
 
-In a Google Cloud project, enable:
+## 2. Configure auth providers
 
-- **Places API (New)**
-- **Geocoding API**
+In Supabase → **Authentication → URL Configuration**:
 
-Create an API key. For production, restrict it by HTTP referrer and to the two APIs above.
+- **Site URL**: `http://localhost:3000` for dev, your Vercel URL for prod.
+- **Redirect URLs**: add both
+  - `http://localhost:3000/auth/callback`
+  - `https://YOUR-DOMAIN/auth/callback`
 
-### 2. Local dev
+In **Authentication → Providers**:
+
+- **Email**: enabled by default.
+- **Google**: create OAuth credentials at <https://console.cloud.google.com/apis/credentials> (OAuth client → Web application). Authorized redirect URI is the one Supabase shows on the provider page, typically `https://YOUR-PROJECT-REF.supabase.co/auth/v1/callback`. Paste the client ID + secret back into Supabase.
+- **GitHub**: at <https://github.com/settings/developers> → **New OAuth App**. Authorization callback URL is the same Supabase callback. Paste client ID + secret into Supabase.
+
+## 3. Local dev
 
 ```bash
-npm install
 cp .env.example .env.local
-# edit .env.local and paste your key
+# fill in NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_SITE_URL
+npm install
 npm run dev
 ```
 
-Open http://localhost:3000.
+Open <http://localhost:3000> → sign in → go to **Settings** → paste your Google Maps API key.
 
-### 3. Deploy to Vercel
+The key needs **Places API (New)** and **Geocoding API** enabled in Google Cloud.
 
-```bash
-# from the project root, after pushing to a git remote:
-vercel
-```
+## 4. Deploy to Vercel (via GitHub)
 
-Then add the API key as a **Vercel secret / environment variable**:
+1. Push to GitHub.
+2. Import the repo at <https://vercel.com/new>.
+3. Before the first deploy, add environment variables (Production + Preview + Development):
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `NEXT_PUBLIC_SITE_URL` — your Vercel URL (e.g. `https://businesstowebsite.vercel.app`)
+4. Deploy. Then go back to Supabase and add the production URL to **Site URL** and **Redirect URLs**.
 
-```bash
-vercel env add GOOGLE_MAPS_API_KEY production
-# paste the key when prompted
-vercel env add GOOGLE_MAPS_API_KEY preview
-vercel env add GOOGLE_MAPS_API_KEY development
-```
+## How the key flow works
 
-(Or via the Vercel dashboard → Project → Settings → Environment Variables.)
+1. User signs in (Google / GitHub / email).
+2. User pastes their Google Maps API key on `/settings`. The form posts to a server action that calls `supabase.from('user_api_keys').upsert(...)` using the user's session — RLS guarantees they can only write their own row.
+3. When the user searches, `/api/search` runs on the server, reads the caller's row via their session, and uses that key to call Google. The key is never sent to the browser.
+4. Sign out clears the session.
 
-The variable is server-side only — no `NEXT_PUBLIC_` prefix — so the key never reaches the browser bundle.
+## Security notes
 
-## Notes
+- The publishable key shipped to the browser is safe to expose — RLS is what protects rows. (Same security model as the old anon key, just under a clearer name.)
+- Don't add a Supabase **secret key** (`sb_secret_…`) or the legacy `service_role` key to this project. They bypass RLS and aren't needed for any flow here.
+- Users should restrict their own Google Maps API key in Google Cloud (HTTP referrer + API restrictions) for their own protection — show this guidance on the Settings page if you want.
 
-- The Places API "Text Search" returns up to 20 results per call. To go further you'd page through `nextPageToken`.
-- `websiteUri` being absent in Places data is a strong signal but not a guarantee that the business has no website anywhere on the internet — it just means Google doesn't have one on file. That's usually exactly the signal you want for outreach.
+## Files of note
+
+- `middleware.ts` + `lib/supabase/middleware.ts` — refreshes the Supabase session cookie on every request.
+- `lib/supabase/server.ts` / `client.ts` — server- and browser-side Supabase clients.
+- `app/login/` — login page + server actions for Google / GitHub / email.
+- `app/auth/callback/route.ts` — OAuth & email-confirm code exchange.
+- `app/settings/` — manage the BYO key (save / replace / remove).
+- `app/api/search/route.ts` — text search, per-user key.
+- `app/api/reverse-geocode/route.ts` — city detection, per-user key.
+- `supabase/migrations/0001_user_api_keys.sql` — schema + RLS policies.
