@@ -526,16 +526,30 @@ export default function SearchClient({
     setSellFor(null);
   }
 
-  // Publishes the filled template to Supabase (one row in published_sites,
-  // keyed by a fresh UUID) and opens the resulting /site/<id> URL in a new
-  // tab. We pre-open the tab synchronously so popup blockers don't trip on
-  // the await chain.
+  // Build a URL-safe slug from the business name. ASCII alphanumerics +
+  // hyphens, max 60 chars, no leading/trailing dashes.
+  function slugifyBusinessName(name: string): string {
+    const s = (name || "")
+      .normalize("NFKD")
+      .replace(/[̀-ͯ]/g, "") // strip diacritics
+      .toLowerCase()
+      .replace(/&/g, " and ")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60)
+      .replace(/-+$/, "");
+    return s || "site";
+  }
+
+  // Publishes the filled template under a slug derived from the business
+  // name. If another user already published a site at the same slug, we
+  // append -2, -3, … until we find an available one. URLs look like
+  // /site/tonys-pizza or /site/tonys-pizza-3.
   async function openFilledWebsiteForPlace(p: Place) {
     if (!currentTemplate) return;
 
     const newTab = window.open("about:blank", "_blank");
     if (!newTab) {
-      // Popup blocked; nothing we can do other than fail loud.
       // eslint-disable-next-line no-alert
       alert("Pop-up was blocked. Allow pop-ups for this site and try again.");
       return;
@@ -553,23 +567,41 @@ export default function SearchClient({
         return;
       }
 
-      const { data, error } = await supabase
-        .from("published_sites")
-        .insert({
-          user_id: user.id,
-          html,
-          business_name: p.name,
-        })
-        .select("id")
-        .single();
+      const base = slugifyBusinessName(p.name);
 
-      if (error || !data?.id) {
+      // Race-safe: try the base slug, then -2, -3, …, retrying on the
+      // Postgres unique-violation error (code 23505) until we get an id.
+      let chosen: string | null = null;
+      for (let n = 0; n < 50; n++) {
+        const candidate = n === 0 ? base : `${base}-${n + 1}`;
+        const { error } = await supabase
+          .from("published_sites")
+          .insert({
+            id: candidate,
+            user_id: user.id,
+            html,
+            business_name: p.name,
+          });
+        if (!error) {
+          chosen = candidate;
+          break;
+        }
+        // 23505 = unique_violation. Anything else is a real error.
+        if (error.code !== "23505") {
+          newTab.document.body.innerText =
+            "Failed to publish: " + error.message;
+          return;
+        }
+        // Slug taken — try the next number.
+      }
+
+      if (!chosen) {
         newTab.document.body.innerText =
-          "Failed to publish: " + (error?.message || "no id returned");
+          "Failed to publish: too many duplicates of this name.";
         return;
       }
 
-      newTab.location.href = `${window.location.origin}/site/${data.id}`;
+      newTab.location.href = `${window.location.origin}/site/${chosen}`;
     } catch (err: any) {
       newTab.document.body.innerText = "Failed to publish: " + (err?.message || err);
     }

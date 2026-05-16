@@ -2,7 +2,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Slugs are lowercase alphanumerics with hyphens, no leading/trailing dashes,
+// capped at 80 characters to keep URLs reasonable and to filter out garbage
+// requests from crawlers before they hit the database.
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export async function GET(
   _req: Request,
@@ -10,9 +13,7 @@ export async function GET(
 ) {
   const { id } = await context.params;
 
-  // Cheap upstream filter so we don't hit Supabase with obviously bogus
-  // values from crawlers.
-  if (!UUID_RE.test(id)) {
+  if (id.length > 80 || !SLUG_RE.test(id)) {
     return new Response("Not found", { status: 404 });
   }
 
