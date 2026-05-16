@@ -1074,7 +1074,7 @@ export default function SearchClient({
                     ) : (
                       <div className="result-meta result-no-website">
                         <GlobeIcon />
-                        <span>Business has no website</span>
+                        <span>No website listed</span>
                       </div>
                     )}
                     {p.primaryType && (
