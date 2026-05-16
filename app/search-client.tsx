@@ -103,7 +103,7 @@ function injectMockPaywall(html: string, businessName: string): string {
     align-items: center;
     justify-content: center;
     padding: 24px;
-    font-family: "Inter", "Segoe UI", sans-serif;
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
   }
   .btw-mock-paywall__scrim {
     position: absolute;
@@ -226,15 +226,14 @@ function injectMockPaywall(html: string, businessName: string): string {
   <div class="btw-mock-paywall__scrim"></div>
   <div class="btw-mock-paywall__card">
     <div class="btw-mock-paywall__eyebrow">Preview locked</div>
-    <h2 class="btw-mock-paywall__title">Unlock the full site for ${safeName}</h2>
+    <h2 class="btw-mock-paywall__title">Generate and publish as many business sites as you need</h2>
     <p class="btw-mock-paywall__sub">
-      This live preview is staged exactly where the finished site would appear.
-      Subscribe to view the full page, download the HTML, and publish it under a shareable URL.
+      ${safeName} is one live example. Subscribe to unlock this preview, generate more sites for other businesses, download the HTML, and publish each one under a shareable URL.
     </p>
     <ul class="btw-mock-paywall__list">
-      <li><span class="btw-mock-paywall__tick">✓</span>Unlimited generations</li>
-      <li><span class="btw-mock-paywall__tick">✓</span>Real business photos and map embeds</li>
-      <li><span class="btw-mock-paywall__tick">✓</span>Publish to a client-ready URL in one click</li>
+      <li><span class="btw-mock-paywall__tick">✓</span>Generate unlimited sites across multiple businesses</li>
+      <li><span class="btw-mock-paywall__tick">✓</span>Reuse the workflow for every new lead you want to pitch</li>
+      <li><span class="btw-mock-paywall__tick">✓</span>Publish each finished site to a client-ready URL in one click</li>
     </ul>
     <div class="btw-mock-paywall__actions">
       <a
