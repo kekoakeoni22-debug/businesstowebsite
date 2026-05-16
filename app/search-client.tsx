@@ -17,7 +17,6 @@ import {
   type FillExtras,
 } from "@/lib/generate-site/prompt";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { sendMagicLink, signInWithGoogle } from "./login/actions";
 
 type Place = {
   id: string;
@@ -223,34 +222,78 @@ export default function SearchClient({
   const [signInPromptReason, setSignInPromptReason] = useState<
     null | "generate" | "publish"
   >(null);
-  const [magicLinkEmail, setMagicLinkEmail] = useState("");
-  const [magicLinkLoading, setMagicLinkLoading] = useState(false);
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
-  const [magicLinkError, setMagicLinkError] = useState<string | null>(null);
+  const [signInEmail, setSignInEmail] = useState("");
+  const [signInPassword, setSignInPassword] = useState("");
+  const [signInLoading, setSignInLoading] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
+  const [verifySent, setVerifySent] = useState(false);
 
   function openSignInPrompt(reason: "generate" | "publish") {
     setSignInPromptReason(reason);
-    setMagicLinkEmail("");
-    setMagicLinkSent(false);
-    setMagicLinkError(null);
-    setMagicLinkLoading(false);
+    setSignInEmail("");
+    setSignInPassword("");
+    setSignInError(null);
+    setSignInLoading(false);
+    setVerifySent(false);
   }
 
   function closeSignInPrompt() {
     setSignInPromptReason(null);
   }
 
-  async function handleMagicLinkSubmit(e: React.FormEvent) {
+  async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
-    setMagicLinkError(null);
-    setMagicLinkLoading(true);
-    const result = await sendMagicLink(magicLinkEmail, "/");
-    setMagicLinkLoading(false);
-    if (result.ok) {
-      setMagicLinkSent(true);
-    } else {
-      setMagicLinkError(result.error);
+    setSignInError(null);
+    setSignInLoading(true);
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: signInEmail.trim(),
+      password: signInPassword,
+    });
+    setSignInLoading(false);
+    if (error) {
+      setSignInError(error.message);
+      return;
     }
+    closeSignInPrompt();
+    // Refresh so server components see the new session cookie.
+    window.location.reload();
+  }
+
+  async function handleSignUp() {
+    if (!signInEmail.trim() || !signInPassword) {
+      setSignInError("Enter an email and password first.");
+      return;
+    }
+    setSignInError(null);
+    setSignInLoading(true);
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.auth.signUp({
+      email: signInEmail.trim(),
+      password: signInPassword,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/`,
+      },
+    });
+    setSignInLoading(false);
+    if (error) {
+      setSignInError(error.message);
+      return;
+    }
+    setVerifySent(true);
+  }
+
+  async function handleGoogleSignIn() {
+    setSignInError(null);
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=/`,
+      },
+    });
+    if (error) setSignInError(error.message);
+    // On success, the browser is redirected to Google by Supabase.
   }
 
   useEffect(() => {
@@ -753,7 +796,7 @@ export default function SearchClient({
   // Click handler for the "Copy website URL" button on each result card.
   // Publishes the site, copies the public URL to the clipboard, and flashes
   // a "Copied!" indicator on the button for ~2 seconds. Anonymous visitors
-  // get bounced to /login first — publishing creates a database row tied to
+  // see the in-page sign-in popup first — publishing creates a database row tied to
   // their user_id, so an account is required.
   async function copyWebsiteUrl(p: Place) {
     const supabase = createSupabaseBrowserClient();
@@ -1321,14 +1364,14 @@ export default function SearchClient({
                 : "Create a free account to design a website for this business with Gemini."}
             </p>
 
-            {magicLinkSent ? (
+            {verifySent ? (
               <div className="signin-success">
-                <strong>Check your inbox.</strong> We sent a sign-in link to{" "}
-                <code>{magicLinkEmail}</code>. Click it to return here signed
-                in.
+                <strong>Verification email sent.</strong> Click the link in
+                your inbox to activate <code>{signInEmail}</code>, then come
+                back and sign in.
               </div>
             ) : (
-              <form onSubmit={handleMagicLinkSubmit} className="signin-form">
+              <form onSubmit={handleSignIn} className="signin-form">
                 <label htmlFor="signin-email" className="signin-label">
                   Email
                 </label>
@@ -1338,51 +1381,77 @@ export default function SearchClient({
                   required
                   autoFocus
                   autoComplete="email"
-                  value={magicLinkEmail}
-                  onChange={(e) => setMagicLinkEmail(e.target.value)}
+                  value={signInEmail}
+                  onChange={(e) => setSignInEmail(e.target.value)}
                   placeholder="you@example.com"
                   className="signin-input"
-                  disabled={magicLinkLoading}
+                  disabled={signInLoading}
                 />
-                {magicLinkError && (
-                  <div className="signin-error">{magicLinkError}</div>
+                <label htmlFor="signin-password" className="signin-label">
+                  Password
+                </label>
+                <input
+                  id="signin-password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  value={signInPassword}
+                  onChange={(e) => setSignInPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="signin-input"
+                  disabled={signInLoading}
+                  minLength={6}
+                />
+                {signInError && (
+                  <div className="signin-error">{signInError}</div>
                 )}
-                <button
-                  type="submit"
-                  className="btn btn-primary signin-submit"
-                  disabled={magicLinkLoading}
-                >
-                  {magicLinkLoading ? "Sending…" : "Email me a sign-in link"}
-                </button>
+                <div className="signin-buttons">
+                  <button
+                    type="submit"
+                    className="btn btn-primary signin-submit"
+                    disabled={signInLoading}
+                  >
+                    {signInLoading ? "…" : "Sign in"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn signin-create"
+                    onClick={handleSignUp}
+                    disabled={signInLoading}
+                  >
+                    Create account
+                  </button>
+                </div>
               </form>
             )}
 
             <div className="signin-divider"><span>or</span></div>
 
-            <form action={signInWithGoogle}>
-              <input type="hidden" name="next" value="/" />
-              <button className="btn-google signin-google" type="submit">
-                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                  <path
-                    fill="#4285F4"
-                    d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A9 9 0 0 0 9 18z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A9 9 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A9 9 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
-                  />
-                </svg>
-                Continue with Google
-              </button>
-            </form>
+            <button
+              type="button"
+              className="btn-google signin-google"
+              onClick={handleGoogleSignIn}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                <path
+                  fill="#4285F4"
+                  d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A9 9 0 0 0 9 18z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A9 9 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A9 9 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
+                />
+              </svg>
+              Continue with Google
+            </button>
           </div>
         </div>
       )}

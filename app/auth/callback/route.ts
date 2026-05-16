@@ -11,12 +11,12 @@ export async function GET(request: Request) {
 
   if (errorDescription) {
     return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(errorDescription)}`
+      `${origin}/?auth_error=${encodeURIComponent(errorDescription)}`
     );
   }
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=missing_code`);
+    return NextResponse.redirect(`${origin}/?auth_error=missing_code`);
   }
 
   const supabase = await createSupabaseServerClient();
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
   if (error) {
     return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(error.message)}`
+      `${origin}/?auth_error=${encodeURIComponent(error.message)}`
     );
   }
 

@@ -49,9 +49,7 @@ export default async function Home() {
           Business To Website AI
         </Link>
         <div className="app-user">
-          {isAnonymous ? (
-            <Link href="/login">Sign in</Link>
-          ) : (
+          {!isAnonymous && (
             <>
               <span className="email muted">{user!.email}</span>
               <form action="/auth/signout" method="post">

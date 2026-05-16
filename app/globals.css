@@ -895,11 +895,28 @@ button {
   border-color: var(--gm-blue);
   box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
 }
-.signin-submit {
+.signin-buttons {
+  display: flex;
+  gap: 0.5rem;
   margin-top: 0.25rem;
-  width: 100%;
+}
+.signin-submit {
+  flex: 1;
   padding: 0.65rem 1rem;
   font-size: 0.95rem;
+}
+.signin-create {
+  flex: 1;
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+  background: white;
+  border: 1px solid var(--gm-border);
+  color: var(--gm-text);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.signin-create:hover {
+  background: var(--gm-bg-hover);
 }
 .signin-error {
   color: #d93025;
