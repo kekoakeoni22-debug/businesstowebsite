@@ -255,8 +255,7 @@ export default function SearchClient({
     );
   }, []);
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
+  async function runSearch() {
     if (!query.trim()) return;
     setLoading(true);
     setError(null);
@@ -289,6 +288,21 @@ export default function SearchClient({
       setLoading(false);
     }
   }
+
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    await runSearch();
+  }
+
+  // The no-website filter is server-side (it drives pagination), so toggling
+  // it after a search must refire the request. Other filters apply client-side
+  // via filteredResults and don't need this. Skipped on first mount because
+  // results is still null until the user submits the form once.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (results === null) return;
+    runSearch();
+  }, [filterNoWebsite]);
 
   // Client-side post-filters applied on top of whatever the server returned.
   // (No-website filtering happens server-side so pagination can target enough
