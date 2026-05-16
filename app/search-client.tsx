@@ -94,6 +94,28 @@ function SparkIcon() {
   );
 }
 
+function CardIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM4 8V6h16v2H4zm0 4h16v6H4v-6zm2 2v2h6v-2H6z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function DollarIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 function DirectionsIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -164,6 +186,10 @@ export default function SearchClient({
   const [currentTemplate, setCurrentTemplate] = useState<string | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
   const streamCodeRef = useRef<HTMLPreElement | null>(null);
+
+  // Sell-this-website popup
+  const [sellFor, setSellFor] = useState<Place | null>(null);
+  const sellBlobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -493,6 +519,29 @@ export default function SearchClient({
     setCurrentTemplate(null);
   }
 
+  function openSellFor(p: Place) {
+    setSellFor(p);
+  }
+
+  function closeSell() {
+    setSellFor(null);
+    // Revoke the previous blob URL when closing so we don't leak memory if
+    // the user opens many sell modals in a row.
+    if (sellBlobUrlRef.current) {
+      URL.revokeObjectURL(sellBlobUrlRef.current);
+      sellBlobUrlRef.current = null;
+    }
+  }
+
+  function openFilledWebsiteForPlace(p: Place) {
+    if (!currentTemplate) return;
+    const html = fillTemplate(currentTemplate, businessInfoFromPlace(p));
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    sellBlobUrlRef.current = url;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   useEffect(() => {
     if (!previewFor) return;
     function onKey(e: KeyboardEvent) {
@@ -504,6 +553,15 @@ export default function SearchClient({
       document.removeEventListener("keydown", onKey);
     };
   }, [previewFor]);
+
+  useEffect(() => {
+    if (!sellFor) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") closeSell();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [sellFor]);
 
   function fakeDomainFor(name: string) {
     const slug = name
@@ -648,16 +706,29 @@ export default function SearchClient({
                       </div>
                     )}
                     <div className="result-actions">
-                      <button
-                        type="button"
-                        className="action-primary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          generatePreview(p);
-                        }}
-                      >
-                        <SparkIcon /> Generate website
-                      </button>
+                      {currentTemplate ? (
+                        <button
+                          type="button"
+                          className="action-sell"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openSellFor(p);
+                          }}
+                        >
+                          <DollarIcon /> Sell website
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="action-primary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            generatePreview(p);
+                          }}
+                        >
+                          <SparkIcon /> Generate website
+                        </button>
+                      )}
                       {p.address && (
                         <a
                           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.name} ${p.address}`)}`}
@@ -880,6 +951,90 @@ export default function SearchClient({
       )}
         </div>
       </div>
+
+      {sellFor && (
+        <div
+          className="sell-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Sell website to ${sellFor.name}`}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeSell();
+          }}
+        >
+          <div className="sell-modal">
+            <div className="sell-header">
+              <div>
+                <div className="sell-eyebrow">Sell this website to</div>
+                <h3>{sellFor.name}</h3>
+              </div>
+              <button
+                type="button"
+                className="chrome-btn close"
+                onClick={closeSell}
+                aria-label="Close"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="sell-actions">
+              {sellFor.phone ? (
+                <a
+                  className="sell-action"
+                  href={`tel:${sellFor.phone}`}
+                >
+                  <PhoneIcon />
+                  <div>
+                    <div className="sell-action-title">Call the business</div>
+                    <div className="sell-action-sub">{sellFor.phone}</div>
+                  </div>
+                </a>
+              ) : (
+                <div className="sell-action disabled">
+                  <PhoneIcon />
+                  <div>
+                    <div className="sell-action-title">Call the business</div>
+                    <div className="sell-action-sub">No phone on file</div>
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="sell-action"
+                onClick={() => openFilledWebsiteForPlace(sellFor)}
+              >
+                <GlobeIcon />
+                <div>
+                  <div className="sell-action-title">Open the generated website</div>
+                  <div className="sell-action-sub">Opens in a new tab</div>
+                </div>
+              </button>
+
+              <a
+                className="sell-action"
+                href="https://buy.stripe.com/test_placeholder"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <CardIcon />
+                <div>
+                  <div className="sell-action-title">Send Stripe payment link</div>
+                  <div className="sell-action-sub">
+                    Placeholder — wire up real Stripe later
+                  </div>
+                </div>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </APIProvider>
   );
 }

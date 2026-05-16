@@ -420,7 +420,8 @@ button {
   text-decoration: none;
 }
 
-.result-actions .action-primary {
+.result-actions .action-primary,
+.result-actions .action-sell {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -430,16 +431,24 @@ button {
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
-  background: linear-gradient(135deg, #1a73e8 0%, #4285f4 50%, #8430ce 100%);
   color: #fff;
-  box-shadow: 0 1px 2px rgba(26, 115, 232, 0.4);
   transition: filter 0.15s ease, transform 0.15s ease;
 }
-.result-actions .action-primary:hover {
+.result-actions .action-primary {
+  background: linear-gradient(135deg, #1a73e8 0%, #4285f4 50%, #8430ce 100%);
+  box-shadow: 0 1px 2px rgba(26, 115, 232, 0.4);
+}
+.result-actions .action-sell {
+  background: linear-gradient(135deg, #137333 0%, #1e8e3e 50%, #34a853 100%);
+  box-shadow: 0 1px 2px rgba(30, 142, 62, 0.45);
+}
+.result-actions .action-primary:hover,
+.result-actions .action-sell:hover {
   filter: brightness(1.08);
   transform: translateY(-1px);
 }
-.result-actions .action-primary svg {
+.result-actions .action-primary svg,
+.result-actions .action-sell svg {
   filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.45));
 }
 
@@ -724,6 +733,103 @@ button {
   .preview-overlay { padding: 0.75rem; }
   .preview-window { max-height: 100%; border-radius: 10px; }
   .chrome-address { font-size: 0.72rem; padding: 0.3rem 0.55rem; }
+}
+
+/* ========== Sell modal ========== */
+.sell-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(20, 22, 28, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: fade-in 0.18s ease;
+}
+
+.sell-modal {
+  background: var(--gm-bg);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 460px;
+  padding: 1.4rem 1.5rem 1.5rem;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35);
+  animation: pop-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sell-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.sell-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--gm-text);
+  line-height: 1.25;
+}
+.sell-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gm-text-tertiary);
+  margin-bottom: 0.2rem;
+}
+
+.sell-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sell-action {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--gm-border);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--gm-text);
+  text-decoration: none;
+  background: var(--gm-bg);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  width: 100%;
+  font-family: inherit;
+}
+.sell-action:hover {
+  background: var(--gm-bg-hover);
+  border-color: var(--gm-border-strong);
+  text-decoration: none;
+}
+.sell-action.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.sell-action.disabled:hover {
+  background: var(--gm-bg);
+  border-color: var(--gm-border);
+}
+.sell-action > svg {
+  color: var(--gm-text-secondary);
+  flex-shrink: 0;
+}
+.sell-action-title {
+  font-weight: 500;
+  color: var(--gm-text);
+  margin-bottom: 0.1rem;
+}
+.sell-action-sub {
+  font-size: 0.8rem;
+  color: var(--gm-text-secondary);
 }
 
 /* ========== Empty / states ========== */
