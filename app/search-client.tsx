@@ -504,10 +504,12 @@ export default function SearchClient({
   // business's data when the user clicks another result card.
   const [currentTemplate, setCurrentTemplate] = useState<string | null>(null);
   const [mockPreviewLocked, setMockPreviewLocked] = useState(false);
+  const [checkoutUnlocked, setCheckoutUnlocked] = useState(false);
   const [checkoutClientSecret, setCheckoutClientSecret] = useState<string | null>(null);
   const [checkoutStarted, setCheckoutStarted] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const previewAbortRef = useRef<AbortController | null>(null);
   const streamCodeRef = useRef<HTMLPreElement | null>(null);
 
@@ -562,7 +564,12 @@ export default function SearchClient({
       const r = await fetch("/api/checkout/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ placeId: previewFor.id }),
+        body: JSON.stringify({
+          placeId: previewFor.id,
+          query,
+          location,
+          filterNoWebsite,
+        }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data?.error || "Unable to create Stripe checkout session.");
@@ -692,8 +699,10 @@ export default function SearchClient({
     const q = sp.get("q") || "";
     const loc = sp.get("loc") || "";
     const nw = sp.get("nw") === "1";
-    const actionType = sp.get("action") as "generate" | "publish" | null;
-    const placeId = sp.get("placeId");
+      const actionType = sp.get("action") as "generate" | "publish" | null;
+      const placeId = sp.get("placeId");
+      const checkoutSuccess = sp.get("checkout") === "success";
+      if (checkoutSuccess) setCheckoutUnlocked(true);
 
     // Strip the params so a manual refresh doesn't keep resuming.
     window.history.replaceState(null, "", "/");
@@ -710,10 +719,13 @@ export default function SearchClient({
         filterNoWebsite: nw,
       });
       if (!places || !actionType || !placeId) return;
+      // Only auto-run the pending action after a successful checkout return.
+      // Sign-in/OAuth resume should restore search context only.
+      if (!checkoutSuccess) return;
       const place = places.find((p) => p.id === placeId);
       if (!place) return;
       if (actionType === "generate") {
-        generatePreview(place);
+        generatePreview(place, false, checkoutSuccess);
       } else if (actionType === "publish") {
         copyWebsiteUrl(place);
       }
@@ -1076,7 +1088,11 @@ export default function SearchClient({
     setMockPreviewLocked(true);
   }
 
-  async function generatePreview(p: Place, forceRegenerate = false) {
+  async function generatePreview(
+    p: Place,
+    forceRegenerate = false,
+    bypassPaywall = false
+  ) {
     const primaryType = p.primaryType || "business";
     const supabase = createSupabaseBrowserClient();
 
@@ -1095,7 +1111,7 @@ export default function SearchClient({
     // template), pretend to generate by streaming HTML from the database
     // character-by-character, then render the result in a locked iframe.
     // Flip MOCK_GENERATION off below to restore the real flow.
-    if (MOCK_GENERATION) {
+    if (MOCK_GENERATION && !checkoutUnlocked && !bypassPaywall) {
       await runMockGeneration(p);
       return;
     }
@@ -1263,7 +1279,20 @@ export default function SearchClient({
   }, [streamingText]);
 
   function closePreview() {
+    setExportMenuOpen(false);
     resetPreviewState();
+  }
+
+  function downloadPreviewSource() {
+    if (!previewHtml || !previewFor) return;
+    const blob = new Blob([previewHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slugifyBusinessName(previewFor.name)}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExportMenuOpen(false);
   }
 
 
@@ -1558,18 +1587,6 @@ export default function SearchClient({
                     ref={(el) => { cardRefs.current[p.id] = el; }}
                     onClick={() => focusOnPlace(p)}
                   >
-                    {p.photos && p.photos.length > 0 && (
-                      <div className="result-thumb">
-                        <img
-                          src={p.photos[0]}
-                          alt={`${p.name} photo`}
-                          loading="lazy"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).parentElement?.remove();
-                          }}
-                        />
-                      </div>
-                    )}
                     <div className="result-head">
                       <h2 className="result-name">{p.name}</h2>
                       {!p.websiteUri && (
@@ -1762,57 +1779,42 @@ export default function SearchClient({
           }}
         >
           <div className="preview-window">
-            <div className="preview-chrome">
-              <div className="chrome-dots">
-                <span className="dot red" />
-                <span className="dot yellow" />
-                <span className="dot green" />
-              </div>
-              <div className="chrome-address">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path
-                    d="M18 8h-1V6a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zM9 6a3 3 0 0 1 6 0v2H9V6z"
-                    fill="currentColor"
-                  />
-                </svg>
-                <span>https://{fakeDomainFor(previewFor.name)}</span>
-                {previewModel && (
-                  <span className="model-badge">{previewModel}</span>
-                )}
-              </div>
-              <div className="chrome-actions">
-                {previewHtml && !previewLoading && (
+            <div className="preview-body">
+              {previewHtml && !previewLoading && !previewError && (
+                <div className="preview-corner-actions">
                   <button
                     type="button"
-                    className="chrome-btn"
-                    onClick={() => generatePreview(previewFor, true)}
-                    title="Regenerate template from scratch (will call Gemini and overwrite the cached template for this business type)"
+                    className="export-btn"
+                    onClick={() => setExportMenuOpen((v) => !v)}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path
-                        d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.45 11h-2.09A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
-                        fill="currentColor"
-                      />
-                    </svg>
+                    Export website
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="chrome-btn close"
-                  onClick={closePreview}
-                  aria-label="Close"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path
-                      d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div className="preview-body">
+                  {exportMenuOpen && (
+                    <div className="export-menu">
+                      <button
+                        type="button"
+                        onClick={() => copyWebsiteUrl(previewFor)}
+                      >
+                        Copy demo URL
+                      </button>
+                      <button
+                        type="button"
+                        onClick={downloadPreviewSource}
+                      >
+                        Download source
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="preview-close-btn"
+                    onClick={closePreview}
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
               {previewLoading && (
                 <div className="preview-generating">
                   <div className="spark-pulse">
@@ -1998,9 +2000,10 @@ export default function SearchClient({
       )}
 
       {mockPreviewLocked && previewHtml && !previewLoading && !previewError && (
-        <div className="stripe-paywall-page" role="dialog" aria-modal="true" aria-label="Subscribe to access and generate websites">
+        <div className="stripe-paywall-page" role="dialog" aria-modal="true" aria-label="Subscribe to BusinessToWebsite Pro to continnue">
           <div className="stripe-paywall-page-scrim" />
           <div className="stripe-paywall-page-modal">
+            <h2 className="stripe-paywall-message">Subscribe to BusinessToWebsite Pro to continnue</h2>
             <div className="stripe-elements-wrap">
               {checkoutLoading && <div className="stripe-elements-status"></div>}
               {checkoutError && <div className="stripe-elements-status stripe-elements-error">{checkoutError}</div>}
