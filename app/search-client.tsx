@@ -592,9 +592,18 @@ export default function SearchClient({
     const primaryType = p.primaryType || "business";
     const supabase = createSupabaseBrowserClient();
 
-    // Cache lookup happens BEFORE we open the preview overlay so anonymous
-    // users who hit a cached template see the preview directly, and users
-    // who'll be bounced to sign-in never see the empty preview flash open.
+    // Auth check is the VERY first thing. Anonymous visitors see the
+    // sign-in modal after a short delay; the preview overlay never opens.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      await new Promise((r) => setTimeout(r, 600));
+      openSignInPrompt("generate");
+      return;
+    }
+
+    // Signed in — try the cached template first.
     if (!forceRegenerate) {
       const { data: cached } = await supabase
         .from("site_templates")
@@ -628,20 +637,7 @@ export default function SearchClient({
       }
     }
 
-    // No cached template (or user forced a regenerate) — Gemini call is
-    // needed and that requires auth. Show the sign-in popup directly for
-    // anonymous visitors, with a small delay so it doesn't snap up.
-    // Critically, we do NOT open the preview overlay first.
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      await new Promise((r) => setTimeout(r, 600));
-      openSignInPrompt("generate");
-      return;
-    }
-
-    // Authenticated: now it's safe to open the preview and start streaming.
+    // No cache (or forced) — open the preview overlay and stream Gemini.
     previewAbortRef.current?.abort();
     const ac = new AbortController();
     previewAbortRef.current = ac;
