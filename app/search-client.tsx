@@ -328,6 +328,13 @@ export default function SearchClient({
     setError(null);
     setResults(null);
     setActiveId(null);
+
+    // Artificial minimum loading time so the spinner sits long enough to
+    // read as "thinking" rather than blinking on/off. Places API is usually
+    // sub-second; this padding lets the UI breathe.
+    const MIN_LOADING_MS = 1200;
+    const minDelay = new Promise((r) => setTimeout(r, MIN_LOADING_MS));
+
     try {
       const body: Record<string, unknown> = {
         query,
@@ -337,11 +344,14 @@ export default function SearchClient({
       if (coords && locationDetected && location) {
         body.coords = coords;
       }
-      const r = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const [r] = await Promise.all([
+        fetch("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+        minDelay,
+      ]);
       const data = await r.json();
       if (!r.ok) {
         throw new Error(data.error || "Search failed");
