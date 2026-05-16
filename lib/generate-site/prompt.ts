@@ -109,7 +109,13 @@ HARD REQUIREMENTS
 - Subtle animations: fade-in on scroll, hover lifts, transform transitions.
 
 HERO IMAGE
-The hero must use <img src="{{HERO_PHOTO_URL}}" ... /> as its background or large adjacent image. Place with onerror="this.style.display='none'" and back the hero section with a CSS gradient underneath so the layout holds if the photo fails. Dark linear-gradient overlay on top so headline text stays readable.
+The hero must use <img src="{{HERO_PHOTO_URL}}" ... /> as its background or large adjacent image. Place with onerror="this.style.display='none'" and back the hero section with a CSS gradient underneath so the layout holds if the photo fails.
+
+Do NOT put a dark gradient overlay on top of the hero photo — the photo should remain fully visible and crisp. For headline legibility, prefer one of these techniques INSTEAD of obscuring the image:
+- Place the headline text in a side column next to the image (split hero layout), not on top of it.
+- Place the headline below the image rather than over it.
+- If text must overlay the image, give the text itself a soft text-shadow (e.g. \`text-shadow: 0 2px 12px rgba(0,0,0,0.5)\`) or sit it in a small frosted/translucent card behind only the text — never a full-hero dark wash.
+The hero photo's color, lighting, and detail must come through clearly.
 
 CONDITIONAL BLOCK SYNTAX
 
