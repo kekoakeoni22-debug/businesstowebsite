@@ -10,6 +10,42 @@ export type BusinessInfo = {
   query?: string;
 };
 
+const STOPWORDS = new Set([
+  "near", "me", "in", "the", "best", "top", "good", "great", "open", "now",
+  "with", "and", "for", "of", "to", "a", "an", "on", "at", "by", "this",
+  "that", "what", "where", "when", "why", "how", "who", "around", "my",
+]);
+
+function buildHeroPhotoUrl(b: BusinessInfo): string {
+  const fromQuery = (b.query || "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 1 && !STOPWORDS.has(w));
+
+  const fromType = (b.primaryType || "")
+    .toLowerCase()
+    .split("_")
+    .filter((w) => w.length > 1 && !STOPWORDS.has(w));
+
+  const merged: string[] = [];
+  for (const w of [...fromQuery, ...fromType]) {
+    if (!merged.includes(w)) merged.push(w);
+    if (merged.length >= 3) break;
+  }
+  const keywords = merged.length > 0 ? merged.join(",") : "storefront";
+
+  // Deterministic per-business seed so different businesses get different
+  // photos but the same business gets the same photo on regenerate.
+  const seedSource = b.name || keywords;
+  let hash = 0;
+  for (let i = 0; i < seedSource.length; i++) {
+    hash = (hash + seedSource.charCodeAt(i) * (i + 1)) % 9999;
+  }
+  const seed = hash + 1;
+
+  return `https://loremflickr.com/1600/900/${keywords}?lock=${seed}`;
+}
+
 export function buildPrompt(b: BusinessInfo): string {
   const types = (b.types || []).slice(0, 5).join(", ");
   const rating =
@@ -21,7 +57,9 @@ export function buildPrompt(b: BusinessInfo): string {
   const hasPhotos = photos.length > 0;
   const photoList = hasPhotos
     ? photos.map((u, i) => `${i + 1}. ${u}`).join("\n")
-    : "(none — fall back to LoremFlickr)";
+    : "(none)";
+
+  const heroPhotoUrl = buildHeroPhotoUrl(b);
 
   return `You are a senior product designer and front-end engineer hired to design a one-page marketing website for a small local business that does not yet have one.
 
@@ -49,26 +87,11 @@ IMAGE POLICY — READ THIS CAREFULLY. VIOLATIONS WILL BE REJECTED.
 
 There is exactly ONE stock photo on this entire page. It is the hero background. There is no second stock photo. Anywhere. Not in the gallery, not in the about section, not in feature cards, not in the footer, not as a watermark. ONE.
 
-THE ONE HERO PHOTO
+HERO PHOTO — use this exact URL, verbatim, as the hero background:
 
-Build the URL yourself using this exact template:
-  \`https://loremflickr.com/1600/900/<KEYWORDS>?lock=<SEED>\`
+${heroPhotoUrl}
 
-KEYWORDS — must be derived from THIS specific business. Do not use generic words like "business" or "shop". Pick 2 to 4 lowercase, comma-separated, no-spaces keywords by combining:
-- The primary type \`${b.primaryType || "business"}\` (split on underscores into separate keywords).
-- The user's search term: "${b.query || ""}" (pull the meaningful nouns/adjectives, drop filler words like "near", "in", "the", "best", city names, "open now", etc.).
-- One supporting concrete noun appropriate to the category (e.g. "interior", "storefront", "espresso", "scissors", "weights", "pipes", "bread", "cocktails", "books") — never a vague abstract word.
-
-Examples of how to derive keywords for THIS prompt's flow (do not copy these — derive your own from the actual business above):
-- primary type \`thai_restaurant\`, query \`"thai food"\` → \`thai,restaurant,food,interior\`
-- primary type \`hair_salon\`, query \`"salons near me"\` → \`salon,hair,styling\`
-- primary type \`finance\`, query \`"auto loans"\` → \`auto,car,dealership\` (visualize what the business sells, not the abstract category)
-- primary type \`gym\`, query \`"crossfit gym"\` → \`crossfit,gym,fitness\`
-- primary type \`bookstore\`, query \`"used bookstores"\` → \`bookstore,books,shelves\`
-
-SEED — pick a number between 1 and 9999 derived deterministically from the business name (e.g. sum of character codes mod 9999). Different businesses must end up with different seeds so the photos vary.
-
-The hero must have a dark linear-gradient overlay so headline text reads cleanly. The hero section also has a solid tasteful gradient background color underneath the image so the layout holds if the photo fails to load.
+Do not modify the URL. Do not generate any other LoremFlickr URLs anywhere on the page. Place the image with \`onerror="this.style.display='none'"\` and back the hero section with a tasteful CSS gradient underneath so the layout holds if the image fails to load. Add a dark linear-gradient overlay on top of the photo so headline text stays readable.
 
 EVERY OTHER IMAGE
 ${hasPhotos
@@ -94,7 +117,7 @@ Choose whichever fits the business type. Do NOT generate any additional LoremFli
 Counts: exactly 1 LoremFlickr URL anywhere in the output. ${hasPhotos ? `Plus ${photos.length} business photo URL${photos.length === 1 ? "" : "s"} used in the page.` : `No other photos.`} Count them before you finish.
 
 SECTIONS
-Sticky header (name as logo, nav: About / Services or Menu / Gallery / Contact) → Hero with image, headline, subheadline, two CTAs (primary: \`tel:${b.phone || ""}\`) → About (2–3 paragraphs) → Services/Menu (3–6 cards with inline SVG icon + name + short description + optional price) → Gallery (3–6 images) → 1–2 review quotes → Contact + footer with phone link, address (Google Maps deep link), hours, copyright.
+Sticky header (name as logo, nav: About / Services or Menu${hasPhotos ? " / Gallery" : ""} / Contact) → Hero with image, headline, subheadline, two CTAs (primary: \`tel:${b.phone || ""}\`) → About (2–3 paragraphs) → Services/Menu (3–6 cards with inline SVG icon + name + short description + optional price)${hasPhotos ? ` → Gallery using the ${photos.length} business photo${photos.length === 1 ? "" : "s"} above` : ""} → 1–2 review quotes → Contact + footer with phone link, address (Google Maps deep link), hours, copyright.
 
 ACCESSIBILITY
 Descriptive alt text on every image. WCAG-AA color contrast. Semantic landmarks (<header>, <main>, <section>, <footer>).
