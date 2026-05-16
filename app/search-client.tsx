@@ -21,7 +21,8 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 // Toggle to false to call the real Gemini API again. When true, every
 // Generate click streams an existing template from site_templates as if
-// it were being generated live, then pops the paywall modal.
+// it were being generated live, then shows a locked state inside the
+// previewed HTML itself.
 const MOCK_GENERATION = true;
 
 // Used when site_templates is empty so the mock-stream UI always has
@@ -78,6 +79,191 @@ function prettyHostname(url: string): string {
   } catch {
     return url;
   }
+}
+
+function escapeHtmlText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function injectMockPaywall(html: string, businessName: string): string {
+  const safeName = escapeHtmlText(businessName || "this business");
+  const styles = `
+<style id="btw-mock-paywall-styles">
+  html, body { min-height: 100%; overflow: hidden !important; }
+  .btw-mock-paywall {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483646;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: "Inter", "Segoe UI", sans-serif;
+  }
+  .btw-mock-paywall__scrim {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at top, rgba(66, 133, 244, 0.18), transparent 42%),
+      rgba(15, 23, 42, 0.52);
+    backdrop-filter: blur(10px);
+  }
+  .btw-mock-paywall__card {
+    position: relative;
+    width: min(440px, 100%);
+    border-radius: 28px;
+    padding: 28px;
+    color: #0f172a;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+  }
+  .btw-mock-paywall__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.1);
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .btw-mock-paywall__title {
+    margin: 18px 0 10px;
+    font-size: clamp(28px, 5vw, 38px);
+    line-height: 1.05;
+    letter-spacing: -0.04em;
+  }
+  .btw-mock-paywall__sub {
+    margin: 0 0 18px;
+    color: #475569;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .btw-mock-paywall__list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 22px;
+    display: grid;
+    gap: 10px;
+  }
+  .btw-mock-paywall__list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #0f172a;
+    font-size: 14px;
+  }
+  .btw-mock-paywall__tick {
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .btw-mock-paywall__actions {
+    display: grid;
+    gap: 10px;
+  }
+  .btw-mock-paywall__cta,
+  .btw-mock-paywall__dismiss {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 48px;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    border: 0;
+    cursor: pointer;
+  }
+  .btw-mock-paywall__cta {
+    color: #fff;
+    background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 48%, #7c3aed 100%);
+    box-shadow: 0 18px 40px rgba(37, 99, 235, 0.28);
+  }
+  .btw-mock-paywall__dismiss {
+    color: #475569;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.32);
+  }
+  .btw-mock-paywall__note {
+    margin: 14px 0 0;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: center;
+  }
+  @media (max-width: 640px) {
+    .btw-mock-paywall {
+      padding: 16px;
+      align-items: end;
+    }
+    .btw-mock-paywall__card {
+      padding: 22px 18px 18px;
+      border-radius: 22px;
+    }
+  }
+</style>`;
+
+  const overlay = `
+<div class="btw-mock-paywall" role="dialog" aria-modal="true" aria-label="Unlock website preview">
+  <div class="btw-mock-paywall__scrim"></div>
+  <div class="btw-mock-paywall__card">
+    <div class="btw-mock-paywall__eyebrow">Preview locked</div>
+    <h2 class="btw-mock-paywall__title">Unlock the full site for ${safeName}</h2>
+    <p class="btw-mock-paywall__sub">
+      This live preview is staged exactly where the finished site would appear.
+      Subscribe to view the full page, download the HTML, and publish it under a shareable URL.
+    </p>
+    <ul class="btw-mock-paywall__list">
+      <li><span class="btw-mock-paywall__tick">✓</span>Unlimited generations</li>
+      <li><span class="btw-mock-paywall__tick">✓</span>Real business photos and map embeds</li>
+      <li><span class="btw-mock-paywall__tick">✓</span>Publish to a client-ready URL in one click</li>
+    </ul>
+    <div class="btw-mock-paywall__actions">
+      <a
+        class="btw-mock-paywall__cta"
+        href="https://buy.stripe.com/test_placeholder"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Subscribe - $19/month
+      </a>
+      <button
+        type="button"
+        class="btw-mock-paywall__dismiss"
+        onclick="window.parent.postMessage({ type: 'close-mock-paywall' }, '*')"
+      >
+        Maybe later
+      </button>
+    </div>
+    <p class="btw-mock-paywall__note">The browser frame stays live so this reads like the real product flow, not a separate app popup.</p>
+  </div>
+</div>`;
+
+  const withStyles = html.includes("</head>")
+    ? html.replace("</head>", `${styles}\n</head>`)
+    : `${styles}\n${html}`;
+
+  return withStyles.includes("</body>")
+    ? withStyles.replace("</body>", `${overlay}\n</body>`)
+    : `${withStyles}\n${overlay}`;
 }
 
 function renderStars(rating: number) {
@@ -275,15 +461,13 @@ export default function SearchClient({
   // the iframe. Kept separately so we can re-fill it with a different
   // business's data when the user clicks another result card.
   const [currentTemplate, setCurrentTemplate] = useState<string | null>(null);
+  const [mockPreviewLocked, setMockPreviewLocked] = useState(false);
   const previewAbortRef = useRef<AbortController | null>(null);
   const streamCodeRef = useRef<HTMLPreElement | null>(null);
 
   // Transient "Copied!" feedback on the per-card copy button. Holds the
   // place id of the most recently copied URL; cleared after a couple seconds.
   const [copiedFor, setCopiedFor] = useState<string | null>(null);
-
-  // Paywall modal — pops after the mock-stream finishes "generating".
-  const [paywallOpen, setPaywallOpen] = useState(false);
 
   const router = useRouter();
 
@@ -477,6 +661,24 @@ export default function SearchClient({
     );
   }, []);
 
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (event.data?.type !== "close-mock-paywall") return;
+      previewAbortRef.current?.abort();
+      setPreviewFor(null);
+      setPreviewHtml(null);
+      setPreviewModel(null);
+      setPreviewError(null);
+      setPreviewLoading(false);
+      setStreamingText("");
+      setCurrentTemplate(null);
+      setMockPreviewLocked(false);
+    }
+
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
   async function runSearch(
     overrides: {
       query?: string;
@@ -610,9 +812,15 @@ export default function SearchClient({
     ) {
       return;
     }
-    const info = businessInfoFromPlace(p);
+    const filled = fillTemplate(
+      currentTemplate,
+      businessInfoFromPlace(p),
+      buildPreviewExtras(p)
+    );
     setPreviewFor(p);
-    setPreviewHtml(fillTemplate(currentTemplate, info, buildPreviewExtras(p)));
+    setPreviewHtml(
+      mockPreviewLocked ? injectMockPaywall(filled, p.name) : filled
+    );
     setPreviewError(null);
   }
 
@@ -735,6 +943,7 @@ export default function SearchClient({
     setPreviewLoading(true);
     setStreamingText("");
     setCurrentTemplate(null);
+    setMockPreviewLocked(false);
     setPreviewModel("generating · gemini-3-flash-preview");
 
     // Pull a template to stream. Priority:
@@ -760,10 +969,10 @@ export default function SearchClient({
       html = fallback?.html_template || FALLBACK_MOCK_HTML;
     }
 
-    // Stream in ~60 chunks across ~6 seconds regardless of HTML length so
-    // the pacing feels consistent.
-    const TOTAL_MS = 6000;
-    const CHUNKS = 60;
+    // Stream across ~22 seconds in ~110 chunks. Slower than a real Gemini
+    // run, but the pacing reads as "AI thinking" rather than "instant".
+    const TOTAL_MS = 22000;
+    const CHUNKS = 110;
     const chunkSize = Math.max(1, Math.ceil(html.length / CHUNKS));
     const delayMs = TOTAL_MS / CHUNKS;
     for (let i = 0; i < html.length; i += chunkSize) {
@@ -773,11 +982,21 @@ export default function SearchClient({
     }
     if (ac.signal.aborted) return;
 
-    // Done "generating". Close preview, show paywall.
+    // Done "generating". Keep the preview overlay open (so the streamed
+    // code stays visible behind the paywall) and pop the paywall on top.
     // eslint-disable-next-line no-console
-    console.log("[paywall] stream done, closing preview + opening paywall");
-    closePreview();
-    setPaywallOpen(true);
+    console.log("[paywall] stream done, opening paywall over preview");
+    const filled = fillTemplate(
+      html,
+      businessInfoFromPlace(p),
+      buildPreviewExtras(p)
+    );
+    setCurrentTemplate(html);
+    setPreviewHtml(injectMockPaywall(filled, p.name));
+    setPreviewModel("preview locked · gemini-3-flash-preview");
+    setStreamingText("");
+    setPreviewLoading(false);
+    setMockPreviewLocked(true);
   }
 
   async function generatePreview(p: Place, forceRegenerate = false) {
@@ -800,8 +1019,6 @@ export default function SearchClient({
     // template), pretend to generate by streaming HTML from the database
     // character-by-character, then pop the paywall. Flip MOCK_GENERATION
     // off below to restore the real flow.
-    // eslint-disable-next-line no-console
-    console.log("[paywall] generatePreview: MOCK_GENERATION =", MOCK_GENERATION);
     if (MOCK_GENERATION) {
       await runMockGeneration(p);
       return;
@@ -828,6 +1045,7 @@ export default function SearchClient({
           setPreviewError(null);
           setStreamingText("");
           setCurrentTemplate(cached.html_template);
+          setMockPreviewLocked(false);
           setPreviewHtml(filled);
           setPreviewModel(`template · ${cached.model || "saved"}`);
           setPreviewLoading(false);
@@ -852,6 +1070,7 @@ export default function SearchClient({
     setPreviewLoading(true);
     setStreamingText("");
     setCurrentTemplate(null);
+    setMockPreviewLocked(false);
 
     let lastErrorMsg = "Generation failed.";
 
@@ -945,6 +1164,7 @@ export default function SearchClient({
 
         const filled = fillTemplate(templateHtml, info, buildPreviewExtras(p));
         setCurrentTemplate(templateHtml);
+        setMockPreviewLocked(false);
         setPreviewHtml(filled);
         setPreviewModel(`new · ${model}`);
         setStreamingText("");
@@ -981,6 +1201,7 @@ export default function SearchClient({
     setPreviewLoading(false);
     setStreamingText("");
     setCurrentTemplate(null);
+    setMockPreviewLocked(false);
   }
 
 
@@ -1714,73 +1935,6 @@ export default function SearchClient({
         </div>
       )}
 
-      {paywallOpen && (
-        <div
-          className="paywall-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Unlock your generated website"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setPaywallOpen(false);
-          }}
-        >
-          <div className="paywall-modal">
-            <button
-              type="button"
-              className="signin-close"
-              onClick={() => setPaywallOpen(false)}
-              aria-label="Close"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-                  fill="currentColor"
-                />
-              </svg>
-            </button>
-            <div className="paywall-spark" aria-hidden="true">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M12 1.5l1.95 4.7L18.5 8l-4.55 1.8L12 14.5l-1.95-4.7L5.5 8l4.55-1.8L12 1.5z"
-                  fill="url(#paywall-grad)"
-                />
-                <defs>
-                  <linearGradient id="paywall-grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-                    <stop offset="0" stopColor="#1a73e8" />
-                    <stop offset="1" stopColor="#8430ce" />
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-            <h3 className="paywall-title">Your website is ready</h3>
-            <p className="paywall-sub">
-              Subscribe to view your generated site, download the HTML, and
-              publish it under a custom URL.
-            </p>
-            <ul className="paywall-features">
-              <li>Unlimited generations</li>
-              <li>Real business photos &amp; map embeds</li>
-              <li>Publish to a shareable URL</li>
-              <li>Download the full HTML</li>
-            </ul>
-            <a
-              className="btn btn-primary paywall-cta"
-              href="https://buy.stripe.com/test_placeholder"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Subscribe — $19/month
-            </a>
-            <button
-              type="button"
-              className="btn-link paywall-dismiss"
-              onClick={() => setPaywallOpen(false)}
-            >
-              Maybe later
-            </button>
-          </div>
-        </div>
-      )}
 
     </APIProvider>
   );
