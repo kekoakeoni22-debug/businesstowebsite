@@ -138,6 +138,7 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
   // Website-generation overlay
   const [previewFor, setPreviewFor] = useState<Place | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewModel, setPreviewModel] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
@@ -237,6 +238,7 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
     previewAbortRef.current = ac;
     setPreviewFor(p);
     setPreviewHtml(null);
+    setPreviewModel(null);
     setPreviewError(null);
     setPreviewLoading(true);
     try {
@@ -257,6 +259,7 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Generation failed");
       setPreviewHtml(data.html);
+      setPreviewModel(data.model || null);
     } catch (err: any) {
       if (err?.name === "AbortError") return;
       setPreviewError(err.message || "Generation failed");
@@ -269,6 +272,7 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
     previewAbortRef.current?.abort();
     setPreviewFor(null);
     setPreviewHtml(null);
+    setPreviewModel(null);
     setPreviewError(null);
     setPreviewLoading(false);
   }
@@ -563,6 +567,9 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
                   />
                 </svg>
                 <span>https://{fakeDomainFor(previewFor.name)}</span>
+                {previewModel && (
+                  <span className="model-badge">{previewModel}</span>
+                )}
               </div>
               <div className="chrome-actions">
                 {previewHtml && !previewLoading && (
@@ -606,8 +613,8 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
                     Designing a website for <strong>{previewFor.name}</strong>
                   </div>
                   <div className="preview-generating-sub">
-                    Gemini 3.1 Pro is composing the layout, copy, and stock
-                    photo selections — usually 10–25 seconds.
+                    Gemini is composing the layout, copy, and stock photo
+                    selections — usually 10–25 seconds.
                   </div>
                   <div className="shimmer-bar"><span /></div>
                 </div>

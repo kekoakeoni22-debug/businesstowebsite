@@ -4,7 +4,27 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MODEL = "gemini-3.1-pro-preview";
+// Try models in order from best quality to most-broadly-available.
+// 3.1 Pro is paid-tier only (free quota is 0). 2.5 Pro is best free-tier
+// option for design quality. 2.5 Flash is the universally-available fallback.
+const MODEL_CHAIN = [
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
+] as const;
+
+function isQuotaOrAccessError(status: number, message: string) {
+  if (status === 429) return true;
+  if (status === 403) return true;
+  if (status === 404) return true;
+  const m = (message || "").toLowerCase();
+  return (
+    m.includes("quota") ||
+    m.includes("rate") ||
+    m.includes("permission") ||
+    m.includes("not found") ||
+    m.includes("not supported")
+  );
+}
 
 type Body = {
   name?: string;
@@ -116,60 +136,86 @@ export async function POST(req: Request) {
 
   const prompt = buildPrompt(body);
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(
-    geminiKey
-  )}`;
+  let lastErrorMsg = "Gemini call failed.";
+  let lastErrorStatus = 502;
+  const attempted: string[] = [];
 
-  let resp: Response;
-  try {
-    resp = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.85,
-          topP: 0.95,
-          maxOutputTokens: 16384,
-          responseMimeType: "text/plain",
-        },
-      }),
-    });
-  } catch (e: any) {
-    return NextResponse.json(
-      { error: `Network error calling Gemini: ${e.message || e}` },
-      { status: 502 }
-    );
-  }
+  for (const model of MODEL_CHAIN) {
+    attempted.push(model);
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
+      geminiKey
+    )}`;
 
-  if (!resp.ok) {
-    const text = await resp.text();
-    let parsed: any = text;
+    let resp: Response;
     try {
-      parsed = JSON.parse(text);
-    } catch {
-      /* keep text */
+      resp = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.85,
+            topP: 0.95,
+            maxOutputTokens: 16384,
+            responseMimeType: "text/plain",
+          },
+        }),
+      });
+    } catch (e: any) {
+      lastErrorMsg = `Network error calling Gemini: ${e.message || e}`;
+      lastErrorStatus = 502;
+      continue;
     }
-    const message =
-      parsed?.error?.message ||
-      (typeof parsed === "string" ? parsed : null) ||
-      `Gemini API error (HTTP ${resp.status}).`;
-    return NextResponse.json({ error: message }, { status: resp.status });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      let parsed: any = text;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        /* keep text */
+      }
+      const message =
+        parsed?.error?.message ||
+        (typeof parsed === "string" ? parsed : null) ||
+        `Gemini API error (HTTP ${resp.status}).`;
+      lastErrorMsg = message;
+      lastErrorStatus = resp.status;
+
+      if (isQuotaOrAccessError(resp.status, message)) {
+        // Try the next model in the chain.
+        continue;
+      }
+      // Non-recoverable error (bad request, auth, etc.) — surface immediately.
+      return NextResponse.json(
+        { error: message, attempted },
+        { status: resp.status }
+      );
+    }
+
+    const data = await resp.json();
+    const text: string | undefined = data?.candidates?.[0]?.content?.parts
+      ?.map((p: any) => p?.text || "")
+      .join("");
+
+    if (!text) {
+      lastErrorMsg = "Gemini returned no content.";
+      lastErrorStatus = 502;
+      continue;
+    }
+
+    return NextResponse.json({
+      html: stripFences(text),
+      model,
+      attempted,
+    });
   }
 
-  const data = await resp.json();
-  const text: string | undefined = data?.candidates?.[0]?.content?.parts
-    ?.map((p: any) => p?.text || "")
-    .join("");
-
-  if (!text) {
-    return NextResponse.json(
-      { error: "Gemini returned no content." },
-      { status: 502 }
-    );
-  }
-
-  const html = stripFences(text);
-
-  return NextResponse.json({ html, model: MODEL });
+  return NextResponse.json(
+    {
+      error: `${lastErrorMsg} (tried: ${attempted.join(", ")})`,
+      attempted,
+    },
+    { status: lastErrorStatus }
+  );
 }
