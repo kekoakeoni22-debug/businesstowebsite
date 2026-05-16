@@ -26,13 +26,21 @@ async function getSiteUrl() {
   return "http://localhost:3000";
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const siteUrl = await getSiteUrl();
+  // Forward ?next from the login page through OAuth so the callback can
+  // send the user back where they started (e.g. / after they got bounced
+  // from "Generate website" or "Copy website URL").
+  const nextRaw = String(formData.get("next") || "/");
+  const next = nextRaw.startsWith("/") ? nextRaw : "/";
+  const callback = new URL(`${siteUrl}/auth/callback`);
+  callback.searchParams.set("next", next);
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${siteUrl}/auth/callback`,
+      redirectTo: callback.toString(),
     },
   });
 

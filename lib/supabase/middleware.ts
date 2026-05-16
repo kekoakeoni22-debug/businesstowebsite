@@ -25,20 +25,10 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refreshes the session cookie if expired.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Auto-create an anonymous session for first-time visitors so the homepage
-  // and all features work without seeing a sign-in wall. Requires
-  // "Allow anonymous sign-ins" enabled in Supabase → Authentication.
-  // If the project hasn't enabled it, the call fails silently and the
-  // visitor sees the same page in a logged-out state (publishing will
-  // require manually clicking Sign in).
-  if (!user) {
-    await supabase.auth.signInAnonymously().catch(() => {});
-  }
+  // Refreshes the session cookie if expired. We don't create any kind of
+  // session for first-time visitors — the app works fully without auth,
+  // and signing in is purely opt-in.
+  await supabase.auth.getUser();
 
   return response;
 }

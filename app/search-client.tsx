@@ -507,15 +507,15 @@ export default function SearchClient({
       }
     }
 
-    // No template yet (or forced) — generate one via the edge proxy. The
-    // Gemini key lives in GEMINI_API_KEY on the server; the browser never
-    // sees it.
+    // No template yet (or forced) — generate one via the edge proxy. This
+    // is the gated step: the route requires auth because every call costs
+    // Gemini tokens. Anonymous visitors get bounced to /login here.
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      setPreviewError("Not signed in.");
-      setPreviewLoading(false);
+      closePreview();
+      window.location.href = "/login?next=/";
       return;
     }
 
@@ -592,17 +592,17 @@ export default function SearchClient({
         const fence = /^```(?:html)?\s*([\s\S]*?)\s*```$/i.exec(templateHtml);
         if (fence) templateHtml = fence[1].trim();
 
-        // Save the template for future reuse.
+        // Save the template for future reuse. The table is global (no
+        // user_id) so the cache benefits everyone, not just this user.
         const { error: saveErr } = await supabase
           .from("site_templates")
           .upsert(
             {
-              user_id: user.id,
               primary_type: primaryType,
               html_template: templateHtml,
               model,
             },
-            { onConflict: "user_id,primary_type" }
+            { onConflict: "primary_type" }
           );
         if (saveErr) {
           // eslint-disable-next-line no-console
@@ -715,8 +715,18 @@ export default function SearchClient({
 
   // Click handler for the "Copy website URL" button on each result card.
   // Publishes the site, copies the public URL to the clipboard, and flashes
-  // a "Copied!" indicator on the button for ~2 seconds.
+  // a "Copied!" indicator on the button for ~2 seconds. Anonymous visitors
+  // get bounced to /login first — publishing creates a database row tied to
+  // their user_id, so an account is required.
   async function copyWebsiteUrl(p: Place) {
+    const supabase = createSupabaseBrowserClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      window.location.href = "/login?next=/";
+      return;
+    }
     try {
       const url = await publishSiteForPlace(p);
       await navigator.clipboard.writeText(url);

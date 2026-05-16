@@ -15,11 +15,14 @@ function jsonError(status: number, message: string) {
 }
 
 export async function POST(req: NextRequest) {
+  // Sign-in is required for Gemini generation specifically — every call to
+  // this route costs us tokens, so we gate it behind an account. Search,
+  // photos, and reading cached templates remain anonymous.
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return jsonError(401, "Not signed in.");
+  if (!user) return jsonError(401, "Sign in required to generate a website.");
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {

@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -10,12 +9,6 @@ export async function GET(
   req: NextRequest,
   context: { params: Promise<{ path: string[] }> }
 ) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return new Response("Not signed in", { status: 401 });
-
   const apiKey =
     process.env.GOOGLE_MAPS_API_KEY ||
     process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;

@@ -9,14 +9,18 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  const params = await searchParams;
+  const error = typeof params.error === "string" ? params.error : null;
+  const nextRaw =
+    typeof params.next === "string" && params.next.startsWith("/")
+      ? params.next
+      : "/";
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (user) redirect("/");
-
-  const params = await searchParams;
-  const error = typeof params.error === "string" ? params.error : null;
+  if (user) redirect(nextRaw);
 
   return (
     <main className="auth-shell">
@@ -37,6 +41,7 @@ export default async function LoginPage({
         {error && <div className="banner error">{error}</div>}
 
         <form action={signInWithGoogle}>
+          <input type="hidden" name="next" value={nextRaw} />
           <button className="btn-google" type="submit">
             <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
               <path
