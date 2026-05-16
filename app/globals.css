@@ -531,8 +531,8 @@ button {
   box-shadow: 0 1px 2px rgba(26, 115, 232, 0.4);
 }
 .result-actions .action-sell {
-  background: linear-gradient(135deg, #137333 0%, #1e8e3e 50%, #34a853 100%);
-  box-shadow: 0 1px 2px rgba(30, 142, 62, 0.45);
+  background: linear-gradient(135deg, #1a73e8 0%, #4285f4 50%, #8430ce 100%);
+  box-shadow: 0 1px 2px rgba(26, 115, 232, 0.4);
 }
 .result-actions .action-primary:hover,
 .result-actions .action-sell:hover {
