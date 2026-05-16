@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { buildTemplatePrompt } from "@/lib/generate-site/prompt";
+import Stripe from "stripe";
 
 // Edge runtime: V8 worker that can pass through Gemini's SSE stream without
 // holding open a Node serverless function. Node functions on Vercel would
@@ -32,6 +33,28 @@ function isPaidUser(user: any): boolean {
   return fromMetadata || fromAllowlist;
 }
 
+async function hasActiveStripeSubscription(email?: string | null): Promise<boolean> {
+  if (!email) return false;
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) return false;
+  const stripe = new Stripe(stripeKey);
+  const customers = await stripe.customers.list({ email, limit: 1 });
+  const customer = customers.data[0];
+  if (!customer) return false;
+  const subs = await stripe.subscriptions.list({
+    customer: customer.id,
+    status: "all",
+    limit: 10,
+  });
+  return subs.data.some((s) =>
+    ["active", "trialing", "past_due", "unpaid"].includes(s.status) &&
+    !s.cancel_at_period_end
+  ) || subs.data.some((s) =>
+    ["active", "trialing", "past_due", "unpaid"].includes(s.status) &&
+    s.cancel_at_period_end
+  );
+}
+
 export async function POST(req: NextRequest) {
   // Sign-in is required for Gemini generation specifically — every call to
   // this route costs us tokens, so we gate it behind an account. Search,
@@ -41,7 +64,8 @@ export async function POST(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return jsonError(401, "Sign in required to generate a website.");
-  if (!isPaidUser(user)) {
+  const paidFromStripe = await hasActiveStripeSubscription(user.email);
+  if (!isPaidUser(user) && !paidFromStripe) {
     return jsonError(
       402,
       "Pro subscription required to generate websites."

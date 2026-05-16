@@ -30,16 +30,17 @@ export default async function Home() {
   // without auth. A real Google sign-in is still available via the header,
   // and surfaces the user's email + Sign out once they upgrade.
   const isAnonymous = !user || user.is_anonymous === true;
-  const creditsRaw =
-    user?.user_metadata?.credits ??
-    user?.app_metadata?.credits ??
-    user?.user_metadata?.btw_credits ??
-    user?.app_metadata?.btw_credits ??
-    0;
-  const credits =
-    typeof creditsRaw === "number"
-      ? creditsRaw
-      : Number.parseInt(String(creditsRaw || 0), 10) || 0;
+  let credits = 0;
+  if (user && !isAnonymous) {
+    const { data: creditData } = await supabase.rpc("get_user_credits", {
+      p_user_id: user.id,
+      p_monthly: 4000,
+    });
+    credits =
+      typeof creditData === "number"
+        ? creditData
+        : Number.parseInt(String(creditData || 4000), 10) || 4000;
+  }
 
   const mapsKey: string | null =
     process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || null;
@@ -59,24 +60,29 @@ export default async function Home() {
           Business To Website AI
         </Link>
         <div className="app-user">
-          {!isAnonymous && (
-            <details className="account-menu">
-              <summary className="account-menu-trigger" aria-label="Account menu">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" fill="currentColor" />
-                </svg>
-              </summary>
-              <div className="account-menu-popover">
-                <div className="account-menu-row">
-                  <span className="muted">Credits</span>
-                  <strong>{credits}</strong>
+          {!isAnonymous ? (
+            <>
+              <Link href="/account" className="btn-link">My account</Link>
+              <details className="account-menu">
+                <summary className="account-menu-trigger" aria-label="Account menu">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" fill="currentColor" />
+                  </svg>
+                </summary>
+                <div className="account-menu-popover">
+                  <div className="account-menu-row">
+                    <span className="muted">Credits</span>
+                    <strong>{credits}</strong>
+                  </div>
+                  <Link href="/account" className="account-menu-link">My account</Link>
+                  <form action="/auth/signout" method="post">
+                    <button className="account-menu-link account-menu-logout" type="submit">Log out</button>
+                  </form>
                 </div>
-                <Link href="/account" className="account-menu-link">Our account</Link>
-                <form action="/auth/signout" method="post">
-                  <button className="account-menu-link account-menu-logout" type="submit">Log out</button>
-                </form>
-              </div>
-            </details>
+              </details>
+            </>
+          ) : (
+            <Link href="/?openSignIn=1" className="btn-link">Sign in</Link>
           )}
         </div>
       </header>

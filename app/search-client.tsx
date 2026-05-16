@@ -505,6 +505,7 @@ export default function SearchClient({
   const [currentTemplate, setCurrentTemplate] = useState<string | null>(null);
   const [mockPreviewLocked, setMockPreviewLocked] = useState(false);
   const [checkoutUnlocked, setCheckoutUnlocked] = useState(false);
+  const [isPaidAccount, setIsPaidAccount] = useState(false);
   const [checkoutClientSecret, setCheckoutClientSecret] = useState<string | null>(null);
   const [checkoutStarted, setCheckoutStarted] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -604,6 +605,13 @@ export default function SearchClient({
       setCheckoutError(null);
     }
   }, [mockPreviewLocked]);
+
+  useEffect(() => {
+    fetch("/api/subscription/status")
+      .then((r) => r.json())
+      .then((d) => setIsPaidAccount(Boolean(d?.paid)))
+      .catch(() => setIsPaidAccount(false));
+  }, []);
 
   useEffect(() => {
     if (!mockPreviewLocked || !previewFor) return;
@@ -706,6 +714,19 @@ export default function SearchClient({
   const resumingRef = useRef(false);
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
+    if (sp.get("openSignIn") === "1") {
+      setSignInPromptReason("generate");
+      setPendingAuthAction(null);
+      setSignInEmail("");
+      setSignInPassword("");
+      setSignInError(null);
+      setSignInLoading(false);
+      setVerifySent(false);
+      sp.delete("openSignIn");
+      const qs = sp.toString();
+      window.history.replaceState(null, "", qs ? `/?${qs}` : "/");
+      return;
+    }
     if (sp.get("resume") !== "1") return;
     resumingRef.current = true;
 
@@ -1139,7 +1160,7 @@ export default function SearchClient({
     // template), pretend to generate by streaming HTML from the database
     // character-by-character, then render the result in a locked iframe.
     // Flip MOCK_GENERATION off below to restore the real flow.
-    if (MOCK_GENERATION && !checkoutUnlocked && !bypassPaywall) {
+    if (MOCK_GENERATION && !isPaidAccount && !checkoutUnlocked && !bypassPaywall) {
       await runMockGeneration(p);
       return;
     }

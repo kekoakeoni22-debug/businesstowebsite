@@ -75,6 +75,7 @@ export default async function AccountPage() {
           Business To Website AI
         </Link>
         <div className="app-user">
+          <Link href="/account" className="btn-link">My account</Link>
           <details className="account-menu">
             <summary className="account-menu-trigger" aria-label="Account menu">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
