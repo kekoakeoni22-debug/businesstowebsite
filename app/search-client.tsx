@@ -471,11 +471,9 @@ export default function SearchClient({
       if (e.key === "Escape") closePreview();
     }
     document.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    // Don't lock body scroll — the sidebar remains usable next to the preview.
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
     };
   }, [previewFor]);
 
@@ -739,10 +737,8 @@ export default function SearchClient({
                 </InfoWindow>
               )}
           </Map>
-        </div>
-      </div>
 
-      {previewFor && (
+          {previewFor && (
         <div
           className="preview-overlay"
           role="dialog"
@@ -853,6 +849,8 @@ export default function SearchClient({
           </div>
         </div>
       )}
+        </div>
+      </div>
     </APIProvider>
   );
 }

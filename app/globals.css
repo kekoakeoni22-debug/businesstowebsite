@@ -444,8 +444,10 @@ button {
 }
 
 /* ========== Website preview overlay ========== */
+/* Positioned absolutely inside .app-map so the left sidebar stays visible
+   and interactive while the preview is open. */
 .preview-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 100;
   background: rgba(20, 22, 28, 0.62);
@@ -453,7 +455,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  padding: 1rem;
   animation: fade-in 0.18s ease;
 }
 
