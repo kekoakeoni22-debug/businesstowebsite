@@ -274,88 +274,38 @@ button {
   display: inline-flex;
 }
 
-.chips {
-  position: relative;
-}
-
-.filters-trigger {
-  background: var(--gm-bg);
-  border: 1px solid var(--gm-border);
-  font: inherit;
-  color: var(--gm-text);
-}
-
-.filters-badge {
+.chip-select {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--gm-blue);
-  color: white;
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-
-.filters-popover {
-  position: absolute;
-  top: calc(100% + 0.5rem);
-  left: 0;
-  z-index: 50;
-  width: 320px;
-  background: white;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
   border: 1px solid var(--gm-border);
-  border-radius: 12px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  border-radius: var(--radius-pill);
+  background: var(--gm-bg);
+  font-size: 0.85rem;
+  color: var(--gm-text);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
-
-.filters-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
+.chip-select:hover {
+  background: var(--gm-bg-hover);
 }
-
-.filter-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.6rem 0.25rem;
-  border-bottom: 1px solid var(--gm-border);
-  font-size: 0.9rem;
+.chip-select.active {
+  background: var(--gm-blue-soft);
+  border-color: var(--gm-blue);
+  color: var(--gm-blue);
+  font-weight: 500;
 }
-
-.filter-row:last-of-type {
-  border-bottom: none;
-}
-
-.filter-row select {
-  border: 1px solid var(--gm-border);
-  background: white;
-  border-radius: 6px;
-  padding: 0.3rem 0.5rem;
-  font: inherit;
+.chip-select select {
+  border: none;
+  background: transparent;
   color: inherit;
+  font: inherit;
+  font-weight: inherit;
   cursor: pointer;
-}
-
-.filter-row input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-}
-
-.filters-footer {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 0.75rem;
+  outline: none;
+  padding-right: 0.25rem;
 }
 
 /* ========== Results ========== */
