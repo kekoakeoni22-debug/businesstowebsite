@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   APIProvider,
   Map,
@@ -252,20 +253,29 @@ export default function SearchClient({
   // place id of the most recently copied URL; cleared after a couple seconds.
   const [copiedFor, setCopiedFor] = useState<string | null>(null);
 
+  const router = useRouter();
+
   // In-page sign-in popup. Triggered when an anonymous visitor clicks an
   // action that requires auth (Generate website, Copy website URL).
-  // `signInPromptReason` is just for the headline copy in the modal.
+  // `signInPromptReason` is the headline copy. `pendingAuthAction` is the
+  // original action to re-fire automatically after a successful sign-in
+  // so the user doesn't lose their search/results state.
   const [signInPromptReason, setSignInPromptReason] = useState<
     null | "generate" | "publish"
   >(null);
+  const [pendingAuthAction, setPendingAuthAction] = useState<{
+    type: "generate" | "publish";
+    place: Place;
+  } | null>(null);
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
   const [signInLoading, setSignInLoading] = useState(false);
   const [signInError, setSignInError] = useState<string | null>(null);
   const [verifySent, setVerifySent] = useState(false);
 
-  function openSignInPrompt(reason: "generate" | "publish") {
+  function openSignInPrompt(reason: "generate" | "publish", place: Place) {
     setSignInPromptReason(reason);
+    setPendingAuthAction({ type: reason, place });
     setSignInEmail("");
     setSignInPassword("");
     setSignInError(null);
@@ -291,9 +301,22 @@ export default function SearchClient({
       setSignInError(error.message);
       return;
     }
+
+    // Capture the pending action BEFORE we clear it via closeSignInPrompt.
+    const next = pendingAuthAction;
     closeSignInPrompt();
-    // Refresh so server components see the new session cookie.
-    window.location.reload();
+    setPendingAuthAction(null);
+
+    // Refresh server components so the header picks up the new session
+    // without a full page reload (which would wipe search results).
+    router.refresh();
+
+    // Re-fire whatever the user was doing when they got bounced to sign-in.
+    if (next?.type === "generate") {
+      generatePreview(next.place);
+    } else if (next?.type === "publish") {
+      copyWebsiteUrl(next.place);
+    }
   }
 
   async function handleSignUp() {
@@ -599,7 +622,7 @@ export default function SearchClient({
     } = await supabase.auth.getUser();
     if (!user) {
       await new Promise((r) => setTimeout(r, 600));
-      openSignInPrompt("generate");
+      openSignInPrompt("generate", p);
       return;
     }
 
@@ -855,7 +878,7 @@ export default function SearchClient({
     } = await supabase.auth.getUser();
     if (!user) {
       await new Promise((r) => setTimeout(r, 600));
-      openSignInPrompt("publish");
+      openSignInPrompt("publish", p);
       return;
     }
     try {
