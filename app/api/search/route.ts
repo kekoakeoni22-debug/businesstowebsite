@@ -37,17 +37,28 @@ const FIELD_MASK = [
 const MAX_PHOTOS_PER_PLACE = 6;
 const PHOTO_MAX_WIDTH = 1600;
 
-function buildPhotoUrls(rawPhotos: any[], apiKey: string): string[] {
+function getRequestOrigin(req: Request): string {
+  const host =
+    req.headers.get("x-forwarded-host") ||
+    req.headers.get("host") ||
+    "localhost:3000";
+  const proto =
+    req.headers.get("x-forwarded-proto") ||
+    (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+function buildPhotoUrls(rawPhotos: any[], origin: string): string[] {
   if (!Array.isArray(rawPhotos)) return [];
   const urls: string[] = [];
   for (const ph of rawPhotos.slice(0, MAX_PHOTOS_PER_PLACE)) {
     const name: string | undefined = ph?.name;
     if (!name) continue;
-    // Photo "name" is already a Places resource path like
-    // "places/CHIJ.../photos/ATplDJ...". Append /media and the key.
-    urls.push(
-      `https://places.googleapis.com/v1/${name}/media?maxWidthPx=${PHOTO_MAX_WIDTH}&key=${encodeURIComponent(apiKey)}`
-    );
+    // Route the photo through our own proxy so the Maps API key never appears
+    // in the URL. Gemini is wary of URLs that contain &key=... and tends to
+    // substitute stock photos instead of using them. Clean URLs fix that.
+    // photo "name" is a path like "places/CHIJ.../photos/ATplDJ..."
+    urls.push(`${origin}/api/photo/${name}?w=${PHOTO_MAX_WIDTH}`);
   }
   return urls;
 }
@@ -184,6 +195,8 @@ export async function POST(req: Request) {
     );
   }
 
+  const origin = getRequestOrigin(req);
+
   const allPlaces = collected.map((p) => ({
     id: p.id,
     name: p.displayName?.text || "(unnamed)",
@@ -202,7 +215,7 @@ export async function POST(req: Request) {
       typeof p.location?.longitude === "number"
         ? p.location.longitude
         : undefined,
-    photos: buildPhotoUrls(p.photos || [], apiKey),
+    photos: buildPhotoUrls(p.photos || [], origin),
   }));
 
   const filtered = filterNoWebsite
