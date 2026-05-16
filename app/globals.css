@@ -150,6 +150,61 @@ button {
   color: var(--gm-blue);
   text-decoration: none;
 }
+.account-menu {
+  position: relative;
+}
+.account-menu-trigger {
+  list-style: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid #dadce0;
+  background: #fff;
+  color: #5f6368;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.account-menu-trigger::-webkit-details-marker { display: none; }
+.account-menu-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 220px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.2);
+  overflow: hidden;
+  z-index: 120;
+}
+.account-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef2f7;
+  color: #0f172a;
+}
+.account-menu-link {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  text-decoration: none;
+  background: #fff;
+  border: 0;
+  color: #0f172a;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.account-menu-link:hover {
+  background: #f8fafc;
+}
+.account-menu-logout {
+  border-top: 1px solid #eef2f7;
+}
 
 /* ========== Search shell ========== */
 .search-shell {
@@ -1342,6 +1397,39 @@ button {
 /* ========== Misc ========== */
 .muted {
   color: var(--gm-text-secondary);
+}
+
+.account-page {
+  min-height: calc(100vh - 64px);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+.account-card {
+  width: min(520px, 96vw);
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  padding: 1rem;
+}
+.account-card h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.3rem;
+}
+.account-metric {
+  margin-top: 0.85rem;
+  padding: 0.85rem;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.account-actions {
+  margin-top: 0.85rem;
+  display: flex;
+  gap: 0.8rem;
 }
 
 /* ========== Responsive ========== */
