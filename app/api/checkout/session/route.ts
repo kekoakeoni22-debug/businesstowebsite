@@ -28,7 +28,9 @@ export async function POST(req: Request) {
         line_items: [{ price: priceId, quantity: 1 }],
         return_url: returnUrl,
         client_reference_id: placeId || undefined,
-        allow_promotion_codes: true,
+        wallet_options: {
+          link: { display: "never" as any },
+        } as any,
       });
     } catch (e: any) {
       // Back-compat with accounts/API versions that still expect `embedded`.
@@ -38,7 +40,9 @@ export async function POST(req: Request) {
         line_items: [{ price: priceId, quantity: 1 }],
         return_url: returnUrl,
         client_reference_id: placeId || undefined,
-        allow_promotion_codes: true,
+        wallet_options: {
+          link: { display: "never" as any },
+        } as any,
       });
     }
 
