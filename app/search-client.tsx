@@ -10,10 +10,13 @@ import {
   useMap,
 } from "@vis.gl/react-google-maps";
 import {
-  buildPrompt,
+  buildTemplatePrompt,
+  fillTemplate,
   GEMINI_MODEL_CHAIN,
   isQuotaOrAccessError,
+  type BusinessInfo,
 } from "@/lib/generate-site/prompt";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Place = {
   id: string;
@@ -247,16 +250,21 @@ export default function SearchClient({
     }
   }
 
-  async function generatePreview(p: Place) {
-    if (!geminiKey) {
-      setPreviewFor(p);
-      setPreviewError(
-        "No Gemini API key on file. Add one in Settings, then refresh."
-      );
-      setPreviewLoading(false);
-      return;
-    }
+  function businessInfoFromPlace(p: Place): BusinessInfo {
+    return {
+      name: p.name,
+      primaryType: p.primaryType,
+      types: p.types,
+      address: p.address,
+      phone: p.phone,
+      rating: p.rating,
+      userRatingCount: p.userRatingCount,
+      hours: p.hours,
+      query: query,
+    };
+  }
 
+  async function generatePreview(p: Place, forceRegenerate = false) {
     previewAbortRef.current?.abort();
     const ac = new AbortController();
     previewAbortRef.current = ac;
@@ -267,18 +275,54 @@ export default function SearchClient({
     setPreviewLoading(true);
     setStreamingText("");
 
-    const prompt = buildPrompt({
-      name: p.name,
-      primaryType: p.primaryType,
-      types: p.types,
-      address: p.address,
-      phone: p.phone,
-      rating: p.rating,
-      userRatingCount: p.userRatingCount,
-      hours: p.hours,
-      query: query,
-    });
+    const info = businessInfoFromPlace(p);
+    const primaryType = p.primaryType || "business";
 
+    const supabase = createSupabaseBrowserClient();
+
+    // Try the cached template first unless the user asked for a regenerate.
+    if (!forceRegenerate) {
+      const { data: cached } = await supabase
+        .from("site_templates")
+        .select("html_template, model")
+        .eq("primary_type", primaryType)
+        .maybeSingle();
+
+      if (cached?.html_template) {
+        try {
+          const filled = fillTemplate(cached.html_template, info);
+          setPreviewHtml(filled);
+          setPreviewModel(`template · ${cached.model || "saved"}`);
+          setPreviewLoading(false);
+          return;
+        } catch (err: any) {
+          // If the saved template is somehow malformed, fall through to a
+          // fresh generation rather than showing a broken page.
+          // eslint-disable-next-line no-console
+          console.warn("Failed to fill cached template:", err);
+        }
+      }
+    }
+
+    // No template yet (or forced) — generate one with Gemini, then save it.
+    if (!geminiKey) {
+      setPreviewError(
+        "No Gemini API key on file. Add one in Settings, then refresh."
+      );
+      setPreviewLoading(false);
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setPreviewError("Not signed in.");
+      setPreviewLoading(false);
+      return;
+    }
+
+    const prompt = buildTemplatePrompt(primaryType);
     const requestBody = JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
@@ -317,7 +361,7 @@ export default function SearchClient({
           throw new Error(message);
         }
 
-        setPreviewModel(model);
+        setPreviewModel(`generating · ${model}`);
         if (!r.body) throw new Error("No response stream.");
 
         const reader = r.body.getReader();
@@ -362,20 +406,36 @@ export default function SearchClient({
 
         if (!accumulated.trim()) throw new Error("Empty response from Gemini.");
 
-        let html = accumulated.trim();
-        const fence = /^```(?:html)?\s*([\s\S]*?)\s*```$/i.exec(html);
-        if (fence) html = fence[1].trim();
+        let templateHtml = accumulated.trim();
+        const fence = /^```(?:html)?\s*([\s\S]*?)\s*```$/i.exec(templateHtml);
+        if (fence) templateHtml = fence[1].trim();
 
-        setPreviewHtml(html);
+        // Save the template for future reuse.
+        const { error: saveErr } = await supabase
+          .from("site_templates")
+          .upsert(
+            {
+              user_id: user.id,
+              primary_type: primaryType,
+              html_template: templateHtml,
+              model,
+            },
+            { onConflict: "user_id,primary_type" }
+          );
+        if (saveErr) {
+          // eslint-disable-next-line no-console
+          console.warn("Failed to save template:", saveErr.message);
+        }
+
+        const filled = fillTemplate(templateHtml, info);
+        setPreviewHtml(filled);
+        setPreviewModel(`new · ${model}`);
         setStreamingText("");
         setPreviewLoading(false);
         return;
       } catch (err: any) {
         if (err?.name === "AbortError") return;
         lastErrorMsg = err?.message || lastErrorMsg;
-        // Fall through to the next model only on retryable issues — the
-        // 4xx/quota cases that triggered `continue` already did so above.
-        // Any other error: stop trying.
         setPreviewError(lastErrorMsg);
         setPreviewLoading(false);
         return;
@@ -716,8 +776,8 @@ export default function SearchClient({
                   <button
                     type="button"
                     className="chrome-btn"
-                    onClick={() => generatePreview(previewFor)}
-                    title="Regenerate"
+                    onClick={() => generatePreview(previewFor, true)}
+                    title="Regenerate template from scratch (will call Gemini and overwrite the cached template for this business type)"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <path
