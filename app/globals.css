@@ -683,25 +683,27 @@ button {
   background: #fff;
 }
 
-.stripe-paywall-layer {
-  position: absolute;
+.stripe-paywall-page {
+  position: fixed;
   inset: 0;
-  z-index: 30;
+  z-index: 1400;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 1.25rem;
 }
 
-.stripe-paywall-scrim {
+.stripe-paywall-page-scrim {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.58);
 }
 
-.stripe-paywall-card {
+.stripe-paywall-page-modal {
   position: relative;
-  width: min(560px, 92vw);
+  width: min(740px, 96vw);
+  max-height: 92vh;
+  overflow: auto;
   border-radius: 18px;
   border: 1px solid #e6e8ec;
   background: #ffffff;
@@ -734,55 +736,38 @@ button {
   line-height: 1.5;
 }
 
-.stripe-paywall-list {
-  margin: 0 0 1.2rem;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 0.55rem;
-}
-
-.stripe-paywall-list li {
-  font-size: 0.9rem;
-  color: #1f3b57;
-}
-
-.stripe-paywall-list li::before {
-  content: "•";
-  color: #635bff;
-  margin-right: 0.5rem;
-}
-
-.stripe-paywall-cta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
+.stripe-start-btn {
   width: 100%;
-  min-height: 74px;
-  border-radius: 12px;
+  min-height: 46px;
   border: 0;
+  border-radius: 10px;
   background: #635bff;
   color: #fff;
+  font-size: 0.95rem;
   font-weight: 600;
-  transition: background 0.16s ease, transform 0.16s ease;
+  cursor: pointer;
 }
 
-.stripe-paywall-cta:hover {
-  background: #564fe3;
-  transform: translateY(-1px);
+.stripe-start-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
 }
 
-.stripe-paywall-price {
-  font-size: 1.1rem;
-  line-height: 1.2;
+.stripe-elements-wrap {
+  margin-top: 0.9rem;
+  border: 1px solid #e6e8ec;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
-.stripe-paywall-note {
-  margin-top: 0.2rem;
-  font-size: 0.8rem;
-  opacity: 0.9;
+.stripe-elements-status {
+  padding: 1rem;
+  font-size: 0.92rem;
+  color: #425466;
+}
+
+.stripe-elements-error {
+  color: #b42318;
 }
 
 .preview-generating {
