@@ -724,6 +724,8 @@ export default function SearchClient({
   // "stream" finishes, closes the preview and pops the paywall modal —
   // the user never actually sees the rendered site without paying.
   async function runMockGeneration(p: Place) {
+    // eslint-disable-next-line no-console
+    console.log("[paywall] runMockGeneration start", p.name);
     previewAbortRef.current?.abort();
     const ac = new AbortController();
     previewAbortRef.current = ac;
@@ -772,6 +774,8 @@ export default function SearchClient({
     if (ac.signal.aborted) return;
 
     // Done "generating". Close preview, show paywall.
+    // eslint-disable-next-line no-console
+    console.log("[paywall] stream done, closing preview + opening paywall");
     closePreview();
     setPaywallOpen(true);
   }
@@ -796,6 +800,8 @@ export default function SearchClient({
     // template), pretend to generate by streaming HTML from the database
     // character-by-character, then pop the paywall. Flip MOCK_GENERATION
     // off below to restore the real flow.
+    // eslint-disable-next-line no-console
+    console.log("[paywall] generatePreview: MOCK_GENERATION =", MOCK_GENERATION);
     if (MOCK_GENERATION) {
       await runMockGeneration(p);
       return;
