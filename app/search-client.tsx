@@ -156,11 +156,9 @@ function PanTo({ point }: { point: { lat: number; lng: number } | null }) {
 export default function SearchClient({
   mapsKey,
   geminiKey,
-  hasUnsplashKey,
 }: {
   mapsKey: string;
   geminiKey: string | null;
-  hasUnsplashKey: boolean;
 }) {
   const [query, setQuery] = useState("restaurants");
   const [location, setLocation] = useState("");
@@ -349,13 +347,6 @@ export default function SearchClient({
         `&markers=color:red%7C${p.lat},${p.lng}` +
         `&key=${encodeURIComponent(mapsKey)}`;
     }
-    if (hasUnsplashKey) {
-      const params = new URLSearchParams({
-        type: p.primaryType || "business",
-        name: p.name || "",
-      });
-      extras.HERO_PHOTO_URL = `/api/unsplash-hero?${params.toString()}`;
-    }
     return extras;
   }
 
@@ -383,31 +374,15 @@ export default function SearchClient({
             .catch(() => null)
         : Promise.resolve(null);
 
-    // If the user has an Unsplash key, fetch the hero photo as a data URL
-    // so the published HTML is self-contained.
-    const heroPromise = hasUnsplashKey
-      ? fetch(
-          `/api/unsplash-hero?${new URLSearchParams({
-            type: p.primaryType || "business",
-            name: p.name || "",
-            format: "data",
-          }).toString()}`
-        )
-          .then((r) => (r.ok ? r.text() : null))
-          .catch(() => null)
-      : Promise.resolve(null);
-
-    const [photoDataUrls, mapDataUrl, heroDataUrl] = await Promise.all([
+    const [photoDataUrls, mapDataUrl] = await Promise.all([
       Promise.all(photoPromises),
       mapPromise,
-      heroPromise,
     ]);
 
     photoDataUrls.forEach((url, i) => {
       if (url) (extras as any)[`PHOTO_${i + 1}`] = url;
     });
     if (mapDataUrl) extras.MAP_IMAGE = mapDataUrl;
-    if (heroDataUrl) extras.HERO_PHOTO_URL = heroDataUrl;
     return extras;
   }
 
