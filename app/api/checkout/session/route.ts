@@ -20,14 +20,28 @@ export async function POST(req: Request) {
 
   const stripe = new Stripe(secretKey);
   try {
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      ui_mode: "embedded" as any,
-      line_items: [{ price: priceId, quantity: 1 }],
-      return_url: returnUrl,
-      client_reference_id: placeId || undefined,
-      allow_promotion_codes: true,
-    });
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        ui_mode: "embedded_page" as any,
+        line_items: [{ price: priceId, quantity: 1 }],
+        return_url: returnUrl,
+        client_reference_id: placeId || undefined,
+        allow_promotion_codes: true,
+      });
+    } catch (e: any) {
+      // Back-compat with accounts/API versions that still expect `embedded`.
+      session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        ui_mode: "embedded" as any,
+        line_items: [{ price: priceId, quantity: 1 }],
+        return_url: returnUrl,
+        client_reference_id: placeId || undefined,
+        allow_promotion_codes: true,
+      });
+    }
+
     if (!session.client_secret) return jsonError(500, "Stripe session missing client_secret.");
     return new Response(JSON.stringify({ clientSecret: session.client_secret }), {
       status: 200,
