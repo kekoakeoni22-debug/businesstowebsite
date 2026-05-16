@@ -744,7 +744,7 @@ export default function SearchClient({
     //   3. the hardcoded sample in this file (last-resort, table empty)
     const supabase = createSupabaseBrowserClient();
     const primaryType = p.primaryType || "business";
-    let html: string | null = null;
+    let html: string;
     const { data: matched } = await supabase
       .from("site_templates")
       .select("html_template")
