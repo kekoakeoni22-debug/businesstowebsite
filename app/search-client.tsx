@@ -28,6 +28,7 @@ type Place = {
   lat?: number;
   lng?: number;
   photos?: string[];
+  hours?: string[];
 };
 
 function formatType(t?: string) {
@@ -275,6 +276,7 @@ export default function SearchClient({
       rating: p.rating,
       userRatingCount: p.userRatingCount,
       photos: p.photos,
+      hours: p.hours,
       query: query,
     });
 

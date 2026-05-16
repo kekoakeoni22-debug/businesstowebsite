@@ -29,6 +29,7 @@ const FIELD_MASK = [
   "places.types",
   "places.location",
   "places.photos",
+  "places.regularOpeningHours.weekdayDescriptions",
   "nextPageToken",
 ].join(",");
 
@@ -216,6 +217,9 @@ export async function POST(req: Request) {
         ? p.location.longitude
         : undefined,
     photos: buildPhotoUrls(p.photos || [], origin),
+    hours: Array.isArray(p.regularOpeningHours?.weekdayDescriptions)
+      ? p.regularOpeningHours.weekdayDescriptions
+      : [],
   }));
 
   const filtered = filterNoWebsite
