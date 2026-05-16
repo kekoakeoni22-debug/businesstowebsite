@@ -324,8 +324,8 @@ export default function SearchClient({
 
   // Photo proxy URLs from the search API look like:
   //   https://app.example.com/api/photo/places/<id>/photos/<ref>?w=1600
-  // Pull just the part after /api/photo/ so we can request the data-URL
-  // variant at /api/photo-data/...
+  // Pull just the part after /api/photo/ so we can request the resolved
+  // signed-CDN URL at /api/photo-data/... for the published site.
   function extractPhotoPath(proxyUrl: string): string | null {
     try {
       const u = new URL(proxyUrl);
@@ -362,9 +362,10 @@ export default function SearchClient({
     return extras;
   }
 
-  // Slow extras for publishing: fetch every photo + the static map as
-  // base64 data URLs server-side, so the published HTML is fully
-  // self-contained and doesn't depend on signed Google CDN URLs.
+  // Extras for publishing: resolve every photo's proxy URL to its signed
+  // Google CDN URL so the published HTML doesn't depend on our /api/photo
+  // route (which requires auth). The URLs are public for the lifetime of
+  // their signed token — long enough for the sale-demo use case.
   async function buildPublishExtras(p: Place): Promise<FillExtras> {
     const extras: FillExtras = {};
 
@@ -639,9 +640,9 @@ export default function SearchClient({
     }
 
     try {
-      // Build self-contained HTML: every image/map becomes a data: URL so
-      // the published /site/<slug> page works even if our /api/photo or
-      // Google CDN expires/changes later.
+      // Build self-contained HTML: photos use signed Google CDN URLs (no
+      // /api/photo auth needed when a visitor loads /site/<slug>) and the
+      // map is a public Google Maps embed iframe (also no API key).
       newTab.document.body.innerHTML =
         "<p style='font-family:sans-serif;padding:2rem'>Building your site…</p>";
       const extras = await buildPublishExtras(p);
