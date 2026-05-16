@@ -169,10 +169,37 @@ export default function SearchClient({
   const [locationDetected, setLocationDetected] = useState(
     defaultLocation.length > 0
   );
-  const [filterNoWebsite, setFilterNoWebsite] = useState(true);
+  const [filterNoWebsite, setFilterNoWebsite] = useState(false);
   const [filterHasPhone, setFilterHasPhone] = useState(false);
   const [minRating, setMinRating] = useState(0);
   const [minReviews, setMinReviews] = useState(0);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersRef = useRef<HTMLDivElement | null>(null);
+
+  const activeFilterCount =
+    (filterNoWebsite ? 1 : 0) +
+    (filterHasPhone ? 1 : 0) +
+    (minRating > 0 ? 1 : 0) +
+    (minReviews > 0 ? 1 : 0);
+
+  // Close the popup on outside click or Escape.
+  useEffect(() => {
+    if (!filtersOpen) return;
+    function onDown(e: MouseEvent) {
+      if (filtersRef.current && !filtersRef.current.contains(e.target as Node)) {
+        setFiltersOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setFiltersOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [filtersOpen]);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     defaultCoords
   );
@@ -852,50 +879,99 @@ export default function SearchClient({
                   </button>
                 </div>
 
-                <div className="chips">
-                  <label className={`chip ${filterNoWebsite ? "active" : ""}`}>
-                    <input
-                      type="checkbox"
-                      checked={filterNoWebsite}
-                      onChange={(e) => setFilterNoWebsite(e.target.checked)}
-                    />
-                    <span className="chip-check"><CheckIcon /></span>
-                    No website
-                  </label>
-                  <label className={`chip ${filterHasPhone ? "active" : ""}`}>
-                    <input
-                      type="checkbox"
-                      checked={filterHasPhone}
-                      onChange={(e) => setFilterHasPhone(e.target.checked)}
-                    />
-                    <span className="chip-check"><CheckIcon /></span>
-                    Has phone
-                  </label>
-                  <label className={`chip-select ${minRating > 0 ? "active" : ""}`}>
-                    Rating
-                    <select
-                      value={minRating}
-                      onChange={(e) => setMinRating(parseFloat(e.target.value))}
-                    >
-                      <option value={0}>Any</option>
-                      <option value={3.5}>3.5+</option>
-                      <option value={4}>4.0+</option>
-                      <option value={4.5}>4.5+</option>
-                    </select>
-                  </label>
-                  <label className={`chip-select ${minReviews > 0 ? "active" : ""}`}>
-                    Reviews
-                    <select
-                      value={minReviews}
-                      onChange={(e) => setMinReviews(parseInt(e.target.value, 10))}
-                    >
-                      <option value={0}>Any</option>
-                      <option value={10}>10+</option>
-                      <option value={50}>50+</option>
-                      <option value={100}>100+</option>
-                      <option value={500}>500+</option>
-                    </select>
-                  </label>
+                <div className="chips" ref={filtersRef}>
+                  <button
+                    type="button"
+                    className={`chip filters-trigger ${activeFilterCount > 0 ? "active" : ""}`}
+                    onClick={() => setFiltersOpen((v) => !v)}
+                    aria-expanded={filtersOpen}
+                    aria-haspopup="true"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M4.25 5.61C6.27 8.2 10 13 10 13v6c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-6s3.72-4.8 5.74-7.39A1 1 0 0 0 18.95 4H5.04a1 1 0 0 0-.79 1.61z" fill="currentColor" />
+                    </svg>
+                    Filters
+                    {activeFilterCount > 0 && (
+                      <span className="filters-badge">{activeFilterCount}</span>
+                    )}
+                  </button>
+
+                  {filtersOpen && (
+                    <div className="filters-popover" role="dialog" aria-label="Filters">
+                      <div className="filters-header">
+                        <strong>Filters</strong>
+                        {activeFilterCount > 0 && (
+                          <button
+                            type="button"
+                            className="btn-link"
+                            onClick={() => {
+                              setFilterNoWebsite(false);
+                              setFilterHasPhone(false);
+                              setMinRating(0);
+                              setMinReviews(0);
+                            }}
+                          >
+                            Clear all
+                          </button>
+                        )}
+                      </div>
+
+                      <label className="filter-row">
+                        <span>Business has no website</span>
+                        <input
+                          type="checkbox"
+                          checked={filterNoWebsite}
+                          onChange={(e) => setFilterNoWebsite(e.target.checked)}
+                        />
+                      </label>
+
+                      <label className="filter-row">
+                        <span>Has phone number</span>
+                        <input
+                          type="checkbox"
+                          checked={filterHasPhone}
+                          onChange={(e) => setFilterHasPhone(e.target.checked)}
+                        />
+                      </label>
+
+                      <label className="filter-row">
+                        <span>Minimum rating</span>
+                        <select
+                          value={minRating}
+                          onChange={(e) => setMinRating(parseFloat(e.target.value))}
+                        >
+                          <option value={0}>Any</option>
+                          <option value={3.5}>3.5+</option>
+                          <option value={4}>4.0+</option>
+                          <option value={4.5}>4.5+</option>
+                        </select>
+                      </label>
+
+                      <label className="filter-row">
+                        <span>Minimum reviews</span>
+                        <select
+                          value={minReviews}
+                          onChange={(e) => setMinReviews(parseInt(e.target.value, 10))}
+                        >
+                          <option value={0}>Any</option>
+                          <option value={10}>10+</option>
+                          <option value={50}>50+</option>
+                          <option value={100}>100+</option>
+                          <option value={500}>500+</option>
+                        </select>
+                      </label>
+
+                      <div className="filters-footer">
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => setFiltersOpen(false)}
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </form>
             </div>
