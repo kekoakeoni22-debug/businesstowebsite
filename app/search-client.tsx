@@ -103,7 +103,11 @@ function injectMockPaywall(html: string, businessName: string): string {
     align-items: center;
     justify-content: center;
     padding: 24px;
-    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    font-family: "Segoe UI", Arial, Helvetica, sans-serif !important;
+  }
+  .btw-mock-paywall,
+  .btw-mock-paywall * {
+    font-family: "Segoe UI", Arial, Helvetica, sans-serif !important;
   }
   .btw-mock-paywall__scrim {
     position: absolute;
@@ -178,13 +182,13 @@ function injectMockPaywall(html: string, businessName: string): string {
     display: grid;
     gap: 10px;
   }
-  .btw-mock-paywall__cta,
-  .btw-mock-paywall__dismiss {
+  .btw-mock-paywall__cta {
     display: inline-flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     width: 100%;
-    min-height: 48px;
+    min-height: 60px;
     border-radius: 14px;
     font-size: 15px;
     font-weight: 600;
@@ -197,17 +201,17 @@ function injectMockPaywall(html: string, businessName: string): string {
     background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 48%, #7c3aed 100%);
     box-shadow: 0 18px 40px rgba(37, 99, 235, 0.28);
   }
-  .btw-mock-paywall__dismiss {
-    color: #475569;
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(148, 163, 184, 0.32);
+  .btw-mock-paywall__price {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.1;
   }
-  .btw-mock-paywall__note {
-    margin: 14px 0 0;
-    color: #64748b;
+  .btw-mock-paywall__billing {
+    margin-top: 4px;
     font-size: 12px;
-    line-height: 1.5;
-    text-align: center;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.82);
+    line-height: 1.3;
   }
   @media (max-width: 640px) {
     .btw-mock-paywall {
@@ -225,10 +229,9 @@ function injectMockPaywall(html: string, businessName: string): string {
 <div class="btw-mock-paywall" role="dialog" aria-modal="true" aria-label="Unlock website preview">
   <div class="btw-mock-paywall__scrim"></div>
   <div class="btw-mock-paywall__card">
-    <div class="btw-mock-paywall__eyebrow">Preview locked</div>
     <h2 class="btw-mock-paywall__title">Generate and publish as many business sites as you need</h2>
     <p class="btw-mock-paywall__sub">
-      ${safeName} is one live example. Subscribe to unlock this preview, generate more sites for other businesses, download the HTML, and publish each one under a shareable URL.
+      Generate more sites for other businesses, download the HTML, and publish each one under a shareable URL.
     </p>
     <ul class="btw-mock-paywall__list">
       <li><span class="btw-mock-paywall__tick">✓</span>Generate unlimited sites across multiple businesses</li>
@@ -242,17 +245,10 @@ function injectMockPaywall(html: string, businessName: string): string {
         target="_blank"
         rel="noreferrer"
       >
-        Subscribe - $19/month
+        <span class="btw-mock-paywall__price">$12.99</span>
+        <span class="btw-mock-paywall__billing">Charged monthly. Cancel anytime.</span>
       </a>
-      <button
-        type="button"
-        class="btw-mock-paywall__dismiss"
-        onclick="window.parent.postMessage({ type: 'close-mock-paywall' }, '*')"
-      >
-        Maybe later
-      </button>
     </div>
-    <p class="btw-mock-paywall__note">The browser frame stays live so this reads like the real product flow, not a separate app popup.</p>
   </div>
 </div>`;
 
@@ -660,16 +656,6 @@ export default function SearchClient({
     );
   }, []);
 
-  useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      if (event.data?.type !== "close-mock-paywall") return;
-      resetPreviewState();
-    }
-
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
-
   async function runSearch(
     overrides: {
       query?: string;
@@ -978,7 +964,7 @@ export default function SearchClient({
 
     // Wait a bit before the first bytes appear, then stream slowly enough
     // that the mock generation feels deliberate rather than abrupt.
-    const INITIAL_DELAY_MS = 5000;
+    const INITIAL_DELAY_MS = 7500;
     const TOTAL_MS = 32000;
     const CHUNKS = 110;
     const chunkSize = Math.max(1, Math.ceil(html.length / CHUNKS));
