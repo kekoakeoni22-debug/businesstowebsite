@@ -4,12 +4,13 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-// Try models in order from best quality to most-broadly-available.
-// 3.1 Pro is paid-tier only (free quota is 0). 2.5 Pro is best free-tier
-// option for design quality. 2.5 Flash is the universally-available fallback.
+// Flash first: ~5-15s typical, comfortably under Vercel's 60s function
+// timeout, generous free-tier quota. Pro is higher-quality but routinely
+// times out on Hobby plans; kept as a fallback for paid keys.
+// To prefer Pro, reorder this array.
 const MODEL_CHAIN = [
-  "gemini-2.5-pro",
   "gemini-2.5-flash",
+  "gemini-2.5-pro",
 ] as const;
 
 function isQuotaOrAccessError(status: number, message: string) {

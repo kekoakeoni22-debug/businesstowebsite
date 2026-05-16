@@ -660,7 +660,7 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
                 <iframe
                   title={`Generated website for ${previewFor.name}`}
                   srcDoc={previewHtml}
-                  sandbox="allow-scripts allow-same-origin"
+                  sandbox="allow-scripts"
                   className="preview-iframe"
                 />
               )}
