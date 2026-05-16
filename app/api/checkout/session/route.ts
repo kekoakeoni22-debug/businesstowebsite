@@ -25,7 +25,7 @@ export async function POST(req: Request) {
       session = await stripe.checkout.sessions.create({
         mode: "subscription",
         ui_mode: "embedded_page" as any,
-        payment_method_types: ["card", "link", "us_bank_account", "cashapp"],
+        payment_method_types: ["card", "us_bank_account", "cashapp"],
         line_items: [{ price: priceId, quantity: 1 }],
         return_url: returnUrl,
         client_reference_id: placeId || undefined,
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       session = await stripe.checkout.sessions.create({
         mode: "subscription",
         ui_mode: "embedded" as any,
-        payment_method_types: ["card", "link", "us_bank_account", "cashapp"],
+        payment_method_types: ["card", "us_bank_account", "cashapp"],
         line_items: [{ price: priceId, quantity: 1 }],
         return_url: returnUrl,
         client_reference_id: placeId || undefined,
