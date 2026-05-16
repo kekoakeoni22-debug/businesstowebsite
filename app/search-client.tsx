@@ -73,6 +73,17 @@ function GlobeIcon() {
     </svg>
   );
 }
+function SparkIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 1.5l1.95 4.7L18.5 8l-4.55 1.8L12 14.5l-1.95-4.7L5.5 8l4.55-1.8L12 1.5zm6.5 11.5l1.2 2.9L22.5 17l-2.8 1.1L18.5 21l-1.2-2.9L14.5 17l2.8-1.1L18.5 13zm-13 0l1.2 2.9L9.5 17l-2.8 1.1L5.5 21l-1.2-2.9L1.5 17l2.8-1.1L5.5 13z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 function DirectionsIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -123,6 +134,13 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [panTarget, setPanTarget] = useState<{ lat: number; lng: number } | null>(null);
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
+
+  // Website-generation overlay
+  const [previewFor, setPreviewFor] = useState<Place | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const previewAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -211,6 +229,72 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
       setActiveId(p.id);
       setPanTarget({ lat: p.lat, lng: p.lng });
     }
+  }
+
+  async function generatePreview(p: Place) {
+    previewAbortRef.current?.abort();
+    const ac = new AbortController();
+    previewAbortRef.current = ac;
+    setPreviewFor(p);
+    setPreviewHtml(null);
+    setPreviewError(null);
+    setPreviewLoading(true);
+    try {
+      const r = await fetch("/api/generate-site", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: ac.signal,
+        body: JSON.stringify({
+          name: p.name,
+          primaryType: p.primaryType,
+          types: p.types,
+          address: p.address,
+          phone: p.phone,
+          rating: p.rating,
+          userRatingCount: p.userRatingCount,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Generation failed");
+      setPreviewHtml(data.html);
+    } catch (err: any) {
+      if (err?.name === "AbortError") return;
+      setPreviewError(err.message || "Generation failed");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  function closePreview() {
+    previewAbortRef.current?.abort();
+    setPreviewFor(null);
+    setPreviewHtml(null);
+    setPreviewError(null);
+    setPreviewLoading(false);
+  }
+
+  useEffect(() => {
+    if (!previewFor) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") closePreview();
+    }
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [previewFor]);
+
+  function fakeDomainFor(name: string) {
+    const slug = name
+      .toLowerCase()
+      .replace(/&/g, "and")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 32);
+    return `${slug || "your-business"}.com`;
   }
 
   function focusOnMarker(p: Place) {
@@ -333,6 +417,16 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
                       </div>
                     )}
                     <div className="result-actions">
+                      <button
+                        type="button"
+                        className="action-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          generatePreview(p);
+                        }}
+                      >
+                        <SparkIcon /> Generate website
+                      </button>
                       {p.address && (
                         <a
                           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.name} ${p.address}`)}`}
@@ -443,6 +537,108 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
           </Map>
         </div>
       </div>
+
+      {previewFor && (
+        <div
+          className="preview-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Generated website for ${previewFor.name}`}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closePreview();
+          }}
+        >
+          <div className="preview-window">
+            <div className="preview-chrome">
+              <div className="chrome-dots">
+                <span className="dot red" />
+                <span className="dot yellow" />
+                <span className="dot green" />
+              </div>
+              <div className="chrome-address">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M18 8h-1V6a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zM9 6a3 3 0 0 1 6 0v2H9V6z"
+                    fill="currentColor"
+                  />
+                </svg>
+                <span>https://{fakeDomainFor(previewFor.name)}</span>
+              </div>
+              <div className="chrome-actions">
+                {previewHtml && !previewLoading && (
+                  <button
+                    type="button"
+                    className="chrome-btn"
+                    onClick={() => generatePreview(previewFor)}
+                    title="Regenerate"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path
+                        d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.45 11h-2.09A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="chrome-btn close"
+                  onClick={closePreview}
+                  aria-label="Close"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="preview-body">
+              {previewLoading && (
+                <div className="preview-generating">
+                  <div className="spark-pulse">
+                    <SparkIcon />
+                  </div>
+                  <div className="preview-generating-title">
+                    Designing a website for <strong>{previewFor.name}</strong>
+                  </div>
+                  <div className="preview-generating-sub">
+                    Gemini 3.1 Pro is composing the layout, copy, and stock
+                    photo selections — usually 10–25 seconds.
+                  </div>
+                  <div className="shimmer-bar"><span /></div>
+                </div>
+              )}
+
+              {previewError && !previewLoading && (
+                <div className="preview-error">
+                  <div className="empty-title">Generation failed</div>
+                  <p>{previewError}</p>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => generatePreview(previewFor)}
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+
+              {previewHtml && !previewLoading && !previewError && (
+                <iframe
+                  title={`Generated website for ${previewFor.name}`}
+                  srcDoc={previewHtml}
+                  sandbox="allow-scripts allow-same-origin"
+                  className="preview-iframe"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </APIProvider>
   );
 }
