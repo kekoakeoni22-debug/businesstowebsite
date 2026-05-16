@@ -106,28 +106,6 @@ function SparkIcon() {
   );
 }
 
-function CardIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM4 8V6h16v2H4zm0 4h16v6H4v-6zm2 2v2h6v-2H6z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-function DollarIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
 function DirectionsIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -237,8 +215,9 @@ export default function SearchClient({
   const previewAbortRef = useRef<AbortController | null>(null);
   const streamCodeRef = useRef<HTMLPreElement | null>(null);
 
-  // Sell-this-website popup
-  const [sellFor, setSellFor] = useState<Place | null>(null);
+  // Transient "Copied!" feedback on the per-card copy button. Holds the
+  // place id of the most recently copied URL; cleared after a couple seconds.
+  const [copiedFor, setCopiedFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -694,13 +673,6 @@ export default function SearchClient({
     setCurrentTemplate(null);
   }
 
-  function openSellFor(p: Place) {
-    setSellFor(p);
-  }
-
-  function closeSell() {
-    setSellFor(null);
-  }
 
   // Build a URL-safe slug from the business name. ASCII alphanumerics +
   // hyphens, max 60 chars, no leading/trailing dashes.
@@ -720,109 +692,65 @@ export default function SearchClient({
   // Publishes the filled template under a slug derived from the business
   // name. If another user already published a site at the same slug, we
   // append -2, -3, … until we find an available one. URLs look like
-  // /site/tonys-pizza or /site/tonys-pizza-3.
-  async function openFilledWebsiteForPlace(p: Place) {
-    if (!currentTemplate) return;
+  // /site/tonys-pizza or /site/tonys-pizza-3. Returns the full public URL.
+  async function publishSiteForPlace(p: Place): Promise<string> {
+    if (!currentTemplate) throw new Error("No website template generated yet.");
 
-    const newTab = window.open("about:blank", "_blank");
-    if (!newTab) {
-      // eslint-disable-next-line no-alert
-      alert("Pop-up was blocked. Allow pop-ups for this site and try again.");
-      return;
+    const { extras, failures } = await buildPublishExtras(p);
+    if (failures.length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn("Photo-data failures while publishing:", failures);
     }
+    const html = fillTemplate(
+      currentTemplate,
+      businessInfoFromPlace(p),
+      extras
+    );
 
+    const supabase = createSupabaseBrowserClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not signed in.");
+
+    const base = slugifyBusinessName(p.name);
+
+    // Race-safe: try the base slug, then -2, -3, …, retrying on Postgres
+    // unique-violation (23505) until we get one that isn't taken.
+    for (let n = 0; n < 50; n++) {
+      const candidate = n === 0 ? base : `${base}-${n + 1}`;
+      const { error } = await supabase
+        .from("published_sites")
+        .insert({
+          id: candidate,
+          user_id: user.id,
+          html,
+          business_name: p.name,
+        });
+      if (!error) {
+        return `${window.location.origin}/site/${candidate}`;
+      }
+      if (error.code !== "23505") {
+        throw new Error(error.message);
+      }
+    }
+    throw new Error("Too many duplicates of this business name.");
+  }
+
+  // Click handler for the "Copy website URL" button on each result card.
+  // Publishes the site, copies the public URL to the clipboard, and flashes
+  // a "Copied!" indicator on the button for ~2 seconds.
+  async function copyWebsiteUrl(p: Place) {
     try {
-      // Build self-contained HTML: every photo becomes a base64 data: URL
-      // so the published /site/<slug> page works even after Google's signed
-      // CDN URLs expire. The map is a public Google Maps embed iframe.
-      newTab.document.body.innerHTML =
-        "<p style='font-family:sans-serif;padding:2rem'>Building your site…</p>";
-      const photoCount = (p.photos || []).length;
-
-      // DEBUG: unconditional alert so we can see what's happening end to end.
-      // Lists each proxy URL Places gave us and the path we'd extract from it.
-      // eslint-disable-next-line no-alert
-      alert(
-        `DEBUG buildPublishExtras start\n` +
-          `business: ${p.name}\n` +
-          `p.photos.length: ${photoCount}\n` +
-          `urls:\n${(p.photos || []).map((u, i) => `  ${i + 1}. ${u}`).join("\n") || "  (none)"}\n` +
-          `extracted paths:\n${(p.photos || [])
-            .map((u, i) => `  ${i + 1}. ${extractPhotoPath(u) ?? "(failed to extract)"}`)
-            .join("\n") || "  (none)"}`
-      );
-
-      const { extras, failures } = await buildPublishExtras(p);
-      const photoSuccess = (Object.keys(extras) as (keyof FillExtras)[]).filter(
-        (k) => k.startsWith("PHOTO_")
-      ).length;
-      if (failures.length > 0) {
-        // eslint-disable-next-line no-console
-        console.warn("Photo-data failures while publishing:", failures);
-        // Surface failures inline so the user doesn't need DevTools open.
-        // eslint-disable-next-line no-alert
-        alert(
-          `${failures.length} of ${photoCount} photo(s) couldn't be embedded. The site will publish without them.\n\n` +
-            failures.join("\n")
-        );
-      } else if (photoCount > 0 && photoSuccess === 0) {
-        // eslint-disable-next-line no-alert
-        alert(
-          `Places API returned ${photoCount} photo reference(s) for this business, but none could be extracted. The published site will have no gallery.`
-        );
-      }
-      const html = fillTemplate(
-        currentTemplate,
-        businessInfoFromPlace(p),
-        extras
-      );
-
-      const supabase = createSupabaseBrowserClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        newTab.document.body.innerText = "Not signed in.";
-        return;
-      }
-
-      const base = slugifyBusinessName(p.name);
-
-      // Race-safe: try the base slug, then -2, -3, …, retrying on the
-      // Postgres unique-violation error (code 23505) until we get an id.
-      let chosen: string | null = null;
-      for (let n = 0; n < 50; n++) {
-        const candidate = n === 0 ? base : `${base}-${n + 1}`;
-        const { error } = await supabase
-          .from("published_sites")
-          .insert({
-            id: candidate,
-            user_id: user.id,
-            html,
-            business_name: p.name,
-          });
-        if (!error) {
-          chosen = candidate;
-          break;
-        }
-        // 23505 = unique_violation. Anything else is a real error.
-        if (error.code !== "23505") {
-          newTab.document.body.innerText =
-            "Failed to publish: " + error.message;
-          return;
-        }
-        // Slug taken — try the next number.
-      }
-
-      if (!chosen) {
-        newTab.document.body.innerText =
-          "Failed to publish: too many duplicates of this name.";
-        return;
-      }
-
-      newTab.location.href = `${window.location.origin}/site/${chosen}`;
+      const url = await publishSiteForPlace(p);
+      await navigator.clipboard.writeText(url);
+      setCopiedFor(p.id);
+      setTimeout(() => {
+        setCopiedFor((current) => (current === p.id ? null : current));
+      }, 2000);
     } catch (err: any) {
-      newTab.document.body.innerText = "Failed to publish: " + (err?.message || err);
+      // eslint-disable-next-line no-alert
+      alert("Failed to publish: " + (err?.message || err));
     }
   }
 
@@ -837,15 +765,6 @@ export default function SearchClient({
       document.removeEventListener("keydown", onKey);
     };
   }, [previewFor]);
-
-  useEffect(() => {
-    if (!sellFor) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") closeSell();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [sellFor]);
 
   function fakeDomainFor(name: string) {
     const slug = name
@@ -1096,10 +1015,18 @@ export default function SearchClient({
                           className="action-sell"
                           onClick={(e) => {
                             e.stopPropagation();
-                            openSellFor(p);
+                            copyWebsiteUrl(p);
                           }}
                         >
-                          <DollarIcon /> Sell website
+                          {copiedFor === p.id ? (
+                            <>
+                              <CheckIcon /> Copied!
+                            </>
+                          ) : (
+                            <>
+                              <GlobeIcon /> Copy website URL
+                            </>
+                          )}
                         </button>
                       ) : (
                         <button
@@ -1336,89 +1263,6 @@ export default function SearchClient({
         </div>
       </div>
 
-      {sellFor && (
-        <div
-          className="sell-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Sell website to ${sellFor.name}`}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeSell();
-          }}
-        >
-          <div className="sell-modal">
-            <div className="sell-header">
-              <div>
-                <div className="sell-eyebrow">Sell this website to</div>
-                <h3>{sellFor.name}</h3>
-              </div>
-              <button
-                type="button"
-                className="chrome-btn close"
-                onClick={closeSell}
-                aria-label="Close"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path
-                    d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-                    fill="currentColor"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <div className="sell-actions">
-              {sellFor.phone ? (
-                <a
-                  className="sell-action"
-                  href={`tel:${sellFor.phone}`}
-                >
-                  <PhoneIcon />
-                  <div>
-                    <div className="sell-action-title">Call the business</div>
-                    <div className="sell-action-sub">{sellFor.phone}</div>
-                  </div>
-                </a>
-              ) : (
-                <div className="sell-action disabled">
-                  <PhoneIcon />
-                  <div>
-                    <div className="sell-action-title">Call the business</div>
-                    <div className="sell-action-sub">No phone on file</div>
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="button"
-                className="sell-action"
-                onClick={() => openFilledWebsiteForPlace(sellFor)}
-              >
-                <GlobeIcon />
-                <div>
-                  <div className="sell-action-title">Open the generated website</div>
-                  <div className="sell-action-sub">Opens in a new tab</div>
-                </div>
-              </button>
-
-              <a
-                className="sell-action"
-                href="https://buy.stripe.com/test_placeholder"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <CardIcon />
-                <div>
-                  <div className="sell-action-title">Send Stripe payment link</div>
-                  <div className="sell-action-sub">
-                    Placeholder — wire up real Stripe later
-                  </div>
-                </div>
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
     </APIProvider>
   );
 }
