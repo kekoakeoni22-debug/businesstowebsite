@@ -159,8 +159,44 @@ export default function SearchClient({
   const [filterHasPhone, setFilterHasPhone] = useState(false);
   const [minRating, setMinRating] = useState(0);
   const [minReviews, setMinReviews] = useState(0);
+  // "Pending" mirrors what the user is editing in the popover but isn't yet
+  // applied to the result list. Apply commits these into the real filters.
+  const [pendingNoWebsite, setPendingNoWebsite] = useState(false);
+  const [pendingHasPhone, setPendingHasPhone] = useState(false);
+  const [pendingMinRating, setPendingMinRating] = useState(0);
+  const [pendingMinReviews, setPendingMinReviews] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRef<HTMLDivElement | null>(null);
+
+  function openFilters() {
+    // Seed pending with the currently-applied values so editing starts
+    // from the user's real state rather than from defaults.
+    setPendingNoWebsite(filterNoWebsite);
+    setPendingHasPhone(filterHasPhone);
+    setPendingMinRating(minRating);
+    setPendingMinReviews(minReviews);
+    setFiltersOpen(true);
+  }
+
+  async function applyFilters() {
+    setFiltersOpen(false);
+    const noWebsiteChanged = pendingNoWebsite !== filterNoWebsite;
+    setFilterNoWebsite(pendingNoWebsite);
+    setFilterHasPhone(pendingHasPhone);
+    setMinRating(pendingMinRating);
+    setMinReviews(pendingMinReviews);
+
+    // If the no-website filter changed and we already have results, the
+    // useEffect below fires runSearch, which has its own min-loading delay
+    // baked in. Client-only filter changes get a manual 1.2s loading flash
+    // so the change feels deliberate.
+    const willTriggerSearch = noWebsiteChanged && results !== null;
+    if (!willTriggerSearch && results !== null) {
+      setLoading(true);
+      await new Promise((r) => setTimeout(r, 1200));
+      setLoading(false);
+    }
+  }
 
   const activeFilterCount =
     (filterNoWebsite ? 1 : 0) +
@@ -903,7 +939,7 @@ export default function SearchClient({
                   <button
                     type="button"
                     className={`chip filters-trigger ${activeFilterCount > 0 ? "active" : ""}`}
-                    onClick={() => setFiltersOpen((v) => !v)}
+                    onClick={() => (filtersOpen ? setFiltersOpen(false) : openFilters())}
                     aria-expanded={filtersOpen}
                     aria-haspopup="true"
                   >
@@ -920,15 +956,18 @@ export default function SearchClient({
                     <div className="filters-popover" role="dialog" aria-label="Filters">
                       <div className="filters-header">
                         <strong>Filters</strong>
-                        {activeFilterCount > 0 && (
+                        {(pendingNoWebsite ||
+                          pendingHasPhone ||
+                          pendingMinRating > 0 ||
+                          pendingMinReviews > 0) && (
                           <button
                             type="button"
                             className="btn-link"
                             onClick={() => {
-                              setFilterNoWebsite(false);
-                              setFilterHasPhone(false);
-                              setMinRating(0);
-                              setMinReviews(0);
+                              setPendingNoWebsite(false);
+                              setPendingHasPhone(false);
+                              setPendingMinRating(0);
+                              setPendingMinReviews(0);
                             }}
                           >
                             Clear all
@@ -940,8 +979,8 @@ export default function SearchClient({
                         <span>Business has no website</span>
                         <input
                           type="checkbox"
-                          checked={filterNoWebsite}
-                          onChange={(e) => setFilterNoWebsite(e.target.checked)}
+                          checked={pendingNoWebsite}
+                          onChange={(e) => setPendingNoWebsite(e.target.checked)}
                         />
                       </label>
 
@@ -949,16 +988,16 @@ export default function SearchClient({
                         <span>Has phone number</span>
                         <input
                           type="checkbox"
-                          checked={filterHasPhone}
-                          onChange={(e) => setFilterHasPhone(e.target.checked)}
+                          checked={pendingHasPhone}
+                          onChange={(e) => setPendingHasPhone(e.target.checked)}
                         />
                       </label>
 
                       <label className="filter-row">
                         <span>Minimum rating</span>
                         <select
-                          value={minRating}
-                          onChange={(e) => setMinRating(parseFloat(e.target.value))}
+                          value={pendingMinRating}
+                          onChange={(e) => setPendingMinRating(parseFloat(e.target.value))}
                         >
                           <option value={0}>Any</option>
                           <option value={3.5}>3.5+</option>
@@ -970,8 +1009,8 @@ export default function SearchClient({
                       <label className="filter-row">
                         <span>Minimum reviews</span>
                         <select
-                          value={minReviews}
-                          onChange={(e) => setMinReviews(parseInt(e.target.value, 10))}
+                          value={pendingMinReviews}
+                          onChange={(e) => setPendingMinReviews(parseInt(e.target.value, 10))}
                         >
                           <option value={0}>Any</option>
                           <option value={10}>10+</option>
@@ -985,9 +1024,9 @@ export default function SearchClient({
                         <button
                           type="button"
                           className="btn btn-primary"
-                          onClick={() => setFiltersOpen(false)}
+                          onClick={applyFilters}
                         >
-                          Done
+                          Apply
                         </button>
                       </div>
                     </div>
