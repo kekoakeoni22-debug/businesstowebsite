@@ -7,6 +7,7 @@ export type BusinessInfo = {
   rating?: number;
   userRatingCount?: number;
   photos?: string[];
+  query?: string;
 };
 
 export function buildPrompt(b: BusinessInfo): string {
@@ -31,6 +32,7 @@ BUSINESS DETAILS
 - Address: ${b.address || "n/a"}
 - Phone: ${b.phone || "n/a"}
 - Google reviews: ${rating}
+- User searched for: ${b.query || "n/a"}
 
 DELIVERABLE
 Output a COMPLETE, SINGLE-FILE HTML5 document (no markdown fences, no commentary — pure HTML). Embed all CSS in a <style> tag in <head>. Use minimal vanilla JS only if it adds real value (smooth scroll, mobile menu toggle).
@@ -43,40 +45,53 @@ HARD REQUIREMENTS
 - Use inline SVGs for icons — do not link any external icon CDN.
 - Include subtle animations: fade-in on scroll, hover lifts on cards, transform transitions. Keep them tasteful, not distracting.
 
-IMAGE POLICY (READ CAREFULLY — STRICT)
+IMAGE POLICY — READ THIS CAREFULLY. VIOLATIONS WILL BE REJECTED.
 
-You will use TWO sources of images on this page, in clearly-separated roles:
+There is exactly ONE stock photo on this entire page. It is the hero background. There is no second stock photo. Anywhere. Not in the gallery, not in the about section, not in feature cards, not in the footer, not as a watermark. ONE.
 
-1. HERO PHOTO — exactly ONE LoremFlickr stock photo, used as the hero background or large adjacent hero image. This is the only place a stock photo is permitted when business photos are available. Format:
-   \`https://loremflickr.com/1600/900/<keyword1>,<keyword2>,<keyword3>?lock=<positive integer>\`
+THE ONE HERO PHOTO
 
-   Keyword examples by business type:
-   - thai restaurant → \`https://loremflickr.com/1600/900/thai,restaurant,food?lock=7\`
-   - coffee shop → \`https://loremflickr.com/1600/900/coffee,cafe,interior?lock=12\`
-   - hair salon → \`https://loremflickr.com/1600/900/salon,hair,styling?lock=3\`
-   - gym → \`https://loremflickr.com/1600/900/gym,fitness,weights?lock=9\`
-   - plumber → \`https://loremflickr.com/1600/900/plumbing,tools,pipes?lock=5\`
-   - bakery → \`https://loremflickr.com/1600/900/bakery,bread,pastry?lock=2\`
+Build the URL yourself using this exact template:
+  \`https://loremflickr.com/1600/900/<KEYWORDS>?lock=<SEED>\`
 
-   Keyword rules: 2–4 lowercase comma-separated keywords, most-specific first. The hero must always have a dark gradient overlay so headline text reads cleanly. Back the hero section with a tasteful gradient color so the layout holds even if the photo fails to load.
+KEYWORDS — must be derived from THIS specific business. Do not use generic words like "business" or "shop". Pick 2 to 4 lowercase, comma-separated, no-spaces keywords by combining:
+- The primary type \`${b.primaryType || "business"}\` (split on underscores into separate keywords).
+- The user's search term: "${b.query || ""}" (pull the meaningful nouns/adjectives, drop filler words like "near", "in", "the", "best", city names, "open now", etc.).
+- One supporting concrete noun appropriate to the category (e.g. "interior", "storefront", "espresso", "scissors", "weights", "pipes", "bread", "cocktails", "books") — never a vague abstract word.
 
-2. EVERY OTHER IMAGE ON THE PAGE — use the real business photos below.
-${hasPhotos ? `   You have ${photos.length} real photo${photos.length === 1 ? "" : "s"} of this exact business from Google Maps. Use them in the gallery, the about-section image, any feature/service cards that benefit from imagery, and the contact/visit section. Use as many of these photos as you need — and do not repeat the same photo twice if you have more.
+Examples of how to derive keywords for THIS prompt's flow (do not copy these — derive your own from the actual business above):
+- primary type \`thai_restaurant\`, query \`"thai food"\` → \`thai,restaurant,food,interior\`
+- primary type \`hair_salon\`, query \`"salons near me"\` → \`salon,hair,styling\`
+- primary type \`finance\`, query \`"auto loans"\` → \`auto,car,dealership\` (visualize what the business sells, not the abstract category)
+- primary type \`gym\`, query \`"crossfit gym"\` → \`crossfit,gym,fitness\`
+- primary type \`bookstore\`, query \`"used bookstores"\` → \`bookstore,books,shelves\`
 
-   URLs (in order — photo 1 is the most representative; assume the array order is meaningful):
+SEED — pick a number between 1 and 9999 derived deterministically from the business name (e.g. sum of character codes mod 9999). Different businesses must end up with different seeds so the photos vary.
+
+The hero must have a dark linear-gradient overlay so headline text reads cleanly. The hero section also has a solid tasteful gradient background color underneath the image so the layout holds if the photo fails to load.
+
+EVERY OTHER IMAGE
+${hasPhotos
+  ? `You have ${photos.length} real photo${photos.length === 1 ? "" : "s"} of this exact business from Google Maps. These are the ONLY images allowed elsewhere on the page. Use them in the gallery, the about image, feature cards, the contact section.
+
+URLs in order (photo 1 is most representative):
 ${photoList}
 
-   You MUST use these business photos. Do NOT replace them with LoremFlickr. Do NOT use a LoremFlickr photo anywhere except the single hero photo described in section 1.
+Hard rules:
+- Use each business photo at least once before repeating.
+- \`loading="lazy"\` on every business photo.
+- \`onerror="this.style.display='none'"\` on every business photo.
+- Plausible alt text per photo.
+- A small "Photos: Google Maps" credit in the footer.
+- DO NOT generate any additional LoremFlickr URL anywhere outside the hero. NO. ZERO. Not even one.`
+  : `This listing has NO business photos. In that case the page has NO photographic images outside the hero. Replace what would have been a gallery with one of:
+- An inline-SVG illustrated feature section
+- A two-column "what we do" layout with bold icon + headline cards
+- A bold typographic block-quote section
+- A color-blocked services grid using CSS gradients and inline-SVG icons
+Choose whichever fits the business type. Do NOT generate any additional LoremFlickr URL. ONE stock photo total on the page, which is the hero.`}
 
-   Embed rules for every business photo:
-   - \`loading="lazy"\` (these are not the hero).
-   - \`onerror="this.style.display='none'"\` so a transient fetch failure never breaks the layout.
-   - Reasonable alt text describing what the photo likely shows for this kind of business.
-   - Add a small \`Photos: Google Maps\` credit in the footer.` : `   This listing has NO business photos attached. In this case, you may use additional LoremFlickr stock photos (using the same URL format and keyword rules as section 1) for the gallery, about image, feature cards, etc. Use a different \`?lock=N\` value for each to get visual variety. Apply the same \`loading="lazy"\` and \`onerror\` rules.`}
-
-Image counts to aim for:
-- 1 hero photo (LoremFlickr, always).
-${hasPhotos ? `- 3–6 business photos elsewhere on the page (use what you have, up to ${photos.length}).` : `- 3–5 additional LoremFlickr photos elsewhere on the page.`}
+Counts: exactly 1 LoremFlickr URL anywhere in the output. ${hasPhotos ? `Plus ${photos.length} business photo URL${photos.length === 1 ? "" : "s"} used in the page.` : `No other photos.`} Count them before you finish.
 
 SECTIONS
 Sticky header (name as logo, nav: About / Services or Menu / Gallery / Contact) → Hero with image, headline, subheadline, two CTAs (primary: \`tel:${b.phone || ""}\`) → About (2–3 paragraphs) → Services/Menu (3–6 cards with inline SVG icon + name + short description + optional price) → Gallery (3–6 images) → 1–2 review quotes → Contact + footer with phone link, address (Google Maps deep link), hours, copyright.

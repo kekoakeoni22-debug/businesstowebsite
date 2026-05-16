@@ -275,6 +275,7 @@ export default function SearchClient({
       rating: p.rating,
       userRatingCount: p.userRatingCount,
       photos: p.photos,
+      query: query,
     });
 
     const requestBody = JSON.stringify({
