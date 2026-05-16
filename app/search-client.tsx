@@ -663,6 +663,20 @@ export default function SearchClient({
       newTab.document.body.innerHTML =
         "<p style='font-family:sans-serif;padding:2rem'>Building your site…</p>";
       const photoCount = (p.photos || []).length;
+
+      // DEBUG: unconditional alert so we can see what's happening end to end.
+      // Lists each proxy URL Places gave us and the path we'd extract from it.
+      // eslint-disable-next-line no-alert
+      alert(
+        `DEBUG buildPublishExtras start\n` +
+          `business: ${p.name}\n` +
+          `p.photos.length: ${photoCount}\n` +
+          `urls:\n${(p.photos || []).map((u, i) => `  ${i + 1}. ${u}`).join("\n") || "  (none)"}\n` +
+          `extracted paths:\n${(p.photos || [])
+            .map((u, i) => `  ${i + 1}. ${extractPhotoPath(u) ?? "(failed to extract)"}`)
+            .join("\n") || "  (none)"}`
+      );
+
       const { extras, failures } = await buildPublishExtras(p);
       const photoSuccess = (Object.keys(extras) as (keyof FillExtras)[]).filter(
         (k) => k.startsWith("PHOTO_")
