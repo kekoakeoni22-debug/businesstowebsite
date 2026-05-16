@@ -1059,7 +1059,7 @@ export default function SearchClient({
                         ) : null}
                       </div>
                     )}
-                    {p.websiteUri && (
+                    {p.websiteUri ? (
                       <div className="result-meta result-website">
                         <GlobeIcon />
                         <a
@@ -1070,6 +1070,11 @@ export default function SearchClient({
                         >
                           {prettyHostname(p.websiteUri)}
                         </a>
+                      </div>
+                    ) : (
+                      <div className="result-meta result-no-website">
+                        <GlobeIcon />
+                        <span>Business has no website</span>
                       </div>
                     )}
                     {p.primaryType && (

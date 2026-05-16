@@ -481,6 +481,14 @@ button {
   color: var(--gm-blue);
 }
 
+.result-no-website {
+  color: #d93025;
+  font-weight: 500;
+}
+.result-no-website svg {
+  color: #d93025;
+}
+
 .result-actions {
   display: flex;
   gap: 0.5rem;
