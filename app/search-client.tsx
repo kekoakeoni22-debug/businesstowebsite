@@ -319,6 +319,23 @@ export default function SearchClient({
     }
   }
 
+  // Builds the path we want to land on after an OAuth / email-verify redirect.
+  // The state needed to resume is small (query, location, no-website filter,
+  // and the action+place id), so we just pass it through URL params instead
+  // of localStorage — stateless, no stale-data cleanup, easy to debug.
+  function buildResumePath(): string {
+    const params = new URLSearchParams();
+    params.set("resume", "1");
+    if (query) params.set("q", query);
+    if (location) params.set("loc", location);
+    if (filterNoWebsite) params.set("nw", "1");
+    if (pendingAuthAction) {
+      params.set("action", pendingAuthAction.type);
+      params.set("placeId", pendingAuthAction.place.id);
+    }
+    return `/?${params.toString()}`;
+  }
+
   async function handleSignUp() {
     if (!signInEmail.trim() || !signInPassword) {
       setSignInError("Enter an email and password first.");
@@ -327,11 +344,12 @@ export default function SearchClient({
     setSignInError(null);
     setSignInLoading(true);
     const supabase = createSupabaseBrowserClient();
+    const resumePath = buildResumePath();
     const { error } = await supabase.auth.signUp({
       email: signInEmail.trim(),
       password: signInPassword,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(resumePath)}`,
       },
     });
     setSignInLoading(false);
@@ -345,17 +363,63 @@ export default function SearchClient({
   async function handleGoogleSignIn() {
     setSignInError(null);
     const supabase = createSupabaseBrowserClient();
+    const resumePath = buildResumePath();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(resumePath)}`,
       },
     });
     if (error) setSignInError(error.message);
     // On success, the browser is redirected to Google by Supabase.
   }
 
+  // Resume mount effect: if we landed here from an OAuth or email-verify
+  // round-trip, the URL has ?resume=1&q=...&loc=...&action=...&placeId=...
+  // — re-run the search and fire the original action so the user picks up
+  // exactly where they were.
+  const resumingRef = useRef(false);
   useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("resume") !== "1") return;
+    resumingRef.current = true;
+
+    const q = sp.get("q") || "";
+    const loc = sp.get("loc") || "";
+    const nw = sp.get("nw") === "1";
+    const actionType = sp.get("action") as "generate" | "publish" | null;
+    const placeId = sp.get("placeId");
+
+    // Strip the params so a manual refresh doesn't keep resuming.
+    window.history.replaceState(null, "", "/");
+
+    if (!q) return;
+    setQuery(q);
+    setLocation(loc);
+    setFilterNoWebsite(nw);
+
+    (async () => {
+      const places = await runSearch({
+        query: q,
+        location: loc,
+        filterNoWebsite: nw,
+      });
+      if (!places || !actionType || !placeId) return;
+      const place = places.find((p) => p.id === placeId);
+      if (!place) return;
+      if (actionType === "generate") {
+        generatePreview(place);
+      } else if (actionType === "publish") {
+        copyWebsiteUrl(place);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Skip geolocation when resuming — the resume effect already set
+    // location, and overriding it with the detected city would be jarring.
+    if (resumingRef.current) return;
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -381,8 +445,17 @@ export default function SearchClient({
     );
   }, []);
 
-  async function runSearch() {
-    if (!query.trim()) return;
+  async function runSearch(
+    overrides: {
+      query?: string;
+      location?: string;
+      filterNoWebsite?: boolean;
+    } = {}
+  ): Promise<Place[] | null> {
+    const q = overrides.query ?? query;
+    const loc = overrides.location ?? location;
+    const fnw = overrides.filterNoWebsite ?? filterNoWebsite;
+    if (!q.trim()) return null;
     setLoading(true);
     setError(null);
     setResults(null);
@@ -396,11 +469,11 @@ export default function SearchClient({
 
     try {
       const body: Record<string, unknown> = {
-        query,
-        location,
-        filterNoWebsite,
+        query: q,
+        location: loc,
+        filterNoWebsite: fnw,
       };
-      if (coords && locationDetected && location) {
+      if (coords && locationDetected && loc) {
         body.coords = coords;
       }
       const [r] = await Promise.all([
@@ -415,11 +488,14 @@ export default function SearchClient({
       if (!r.ok) {
         throw new Error(data.error || "Search failed");
       }
-      setResults(data.places || []);
+      const places: Place[] = data.places || [];
+      setResults(places);
       setTotalBeforeFilter(data.totalBeforeFilter ?? 0);
       setPagesFetched(data.pagesFetched ?? 1);
+      return places;
     } catch (err: any) {
       setError(err.message || "Something went wrong");
+      return null;
     } finally {
       setLoading(false);
     }
