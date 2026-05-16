@@ -4,12 +4,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export async function saveApiKey(formData: FormData) {
-  const key = String(formData.get("apiKey") || "").trim();
-  if (!key) {
-    redirect("/settings?error=API+key+cannot+be+empty");
-  }
+type ProviderColumn = "google_maps_api_key" | "gemini_api_key";
 
+async function upsertKey(column: ProviderColumn, value: string) {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -19,20 +16,18 @@ export async function saveApiKey(formData: FormData) {
   const { error } = await supabase
     .from("user_api_keys")
     .upsert(
-      { user_id: user.id, google_maps_api_key: key },
+      { user_id: user.id, [column]: value },
       { onConflict: "user_id" }
     );
 
   if (error) {
     redirect(`/settings?error=${encodeURIComponent(error.message)}`);
   }
-
   revalidatePath("/settings");
   revalidatePath("/");
-  redirect("/settings?notice=Key+saved");
 }
 
-export async function deleteApiKey() {
+async function clearKey(column: ProviderColumn) {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -41,14 +36,40 @@ export async function deleteApiKey() {
 
   const { error } = await supabase
     .from("user_api_keys")
-    .delete()
+    .update({ [column]: null })
     .eq("user_id", user.id);
 
   if (error) {
     redirect(`/settings?error=${encodeURIComponent(error.message)}`);
   }
-
   revalidatePath("/settings");
   revalidatePath("/");
-  redirect("/settings?notice=Key+removed");
+}
+
+export async function saveGoogleMapsKey(formData: FormData) {
+  const key = String(formData.get("apiKey") || "").trim();
+  if (!key) {
+    redirect("/settings?error=Google+Maps+key+cannot+be+empty");
+  }
+  await upsertKey("google_maps_api_key", key);
+  redirect("/settings?notice=Google+Maps+key+saved");
+}
+
+export async function deleteGoogleMapsKey() {
+  await clearKey("google_maps_api_key");
+  redirect("/settings?notice=Google+Maps+key+removed");
+}
+
+export async function saveGeminiKey(formData: FormData) {
+  const key = String(formData.get("apiKey") || "").trim();
+  if (!key) {
+    redirect("/settings?error=Gemini+key+cannot+be+empty");
+  }
+  await upsertKey("gemini_api_key", key);
+  redirect("/settings?notice=Gemini+key+saved");
+}
+
+export async function deleteGeminiKey() {
+  await clearKey("gemini_api_key");
+  redirect("/settings?notice=Gemini+key+removed");
 }

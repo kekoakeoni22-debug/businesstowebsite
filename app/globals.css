@@ -309,6 +309,21 @@ button.oauth.github:hover {
 }
 
 /* Settings */
+.key-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+.key-section:first-of-type {
+  margin-top: 1rem;
+  padding-top: 0;
+  border-top: none;
+}
+.key-section h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.35rem;
+}
+
 .key-status {
   background: #fff;
   border: 1px solid #e5e7eb;
