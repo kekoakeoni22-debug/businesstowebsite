@@ -683,6 +683,108 @@ button {
   background: #fff;
 }
 
+.stripe-paywall-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.stripe-paywall-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.stripe-paywall-card {
+  position: relative;
+  width: min(560px, 92vw);
+  border-radius: 18px;
+  border: 1px solid #e6e8ec;
+  background: #ffffff;
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.35);
+  padding: clamp(1.25rem, 2.8vw, 2rem);
+  color: #0a2540;
+  font-family: "Inter", "Segoe UI", Arial, sans-serif;
+}
+
+.stripe-paywall-kicker {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #635bff;
+}
+
+.stripe-paywall-title {
+  margin: 0;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.stripe-paywall-sub {
+  margin: 0.85rem 0 1rem;
+  font-size: 0.95rem;
+  color: #425466;
+  line-height: 1.5;
+}
+
+.stripe-paywall-list {
+  margin: 0 0 1.2rem;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.stripe-paywall-list li {
+  font-size: 0.9rem;
+  color: #1f3b57;
+}
+
+.stripe-paywall-list li::before {
+  content: "•";
+  color: #635bff;
+  margin-right: 0.5rem;
+}
+
+.stripe-paywall-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  width: 100%;
+  min-height: 74px;
+  border-radius: 12px;
+  border: 0;
+  background: #635bff;
+  color: #fff;
+  font-weight: 600;
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+
+.stripe-paywall-cta:hover {
+  background: #564fe3;
+  transform: translateY(-1px);
+}
+
+.stripe-paywall-price {
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.stripe-paywall-note {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
 .preview-generating {
   position: absolute;
   inset: 0;

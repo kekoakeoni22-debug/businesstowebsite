@@ -113,15 +113,14 @@ function injectMockPaywall(html: string, businessName: string): string {
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(circle at 15% 5%, rgba(26, 115, 232, 0.16), transparent 46%),
-      radial-gradient(circle at 85% 90%, rgba(26, 115, 232, 0.1), transparent 42%),
-      rgba(15, 23, 42, 0.28);
-    backdrop-filter: blur(4px);
+      linear-gradient(rgba(15, 23, 42, 0.62), rgba(15, 23, 42, 0.62)),
+      radial-gradient(circle at 20% 0%, rgba(26, 115, 232, 0.2), transparent 42%),
+      radial-gradient(circle at 80% 100%, rgba(37, 99, 235, 0.16), transparent 44%);
   }
   .btw-mock-paywall__card {
     position: relative;
-    width: min(1020px, 96vw);
-    min-height: min(680px, 90vh);
+    width: min(760px, 94vw);
+    min-height: min(520px, 86vh);
     border-radius: 16px;
     padding: clamp(24px, 3vw, 40px);
     color: #0f172a;
@@ -270,7 +269,7 @@ function injectMockPaywall(html: string, businessName: string): string {
   <div class="btw-mock-paywall__scrim"></div>
   <div class="btw-mock-paywall__card">
     <div class="btw-mock-paywall__content">
-      <h2 class="btw-mock-paywall__title">Generate and publish as many business sites as you need</h2>
+      <h2 class="btw-mock-paywall__title">Subscribe to access and generate websites</h2>
       <p class="btw-mock-paywall__sub">
         Generate more sites for other businesses, download the HTML, and publish each one under a shareable URL.
       </p>
@@ -284,7 +283,7 @@ function injectMockPaywall(html: string, businessName: string): string {
       <div class="btw-mock-paywall__actions">
         <a
           class="btw-mock-paywall__cta"
-          href="https://buy.stripe.com/test_placeholder"
+          href="/api/checkout"
           target="_blank"
           rel="noreferrer"
         >
@@ -834,7 +833,7 @@ export default function SearchClient({
       return;
     }
     setPreviewFor(p);
-    setPreviewHtml(renderPreviewHtml(currentTemplate, p, { locked: mockPreviewLocked }));
+    setPreviewHtml(renderPreviewHtml(currentTemplate, p));
     setPreviewError(null);
   }
 
@@ -852,17 +851,13 @@ export default function SearchClient({
     };
   }
 
-  function renderPreviewHtml(
-    template: string,
-    p: Place,
-    options: { locked?: boolean } = {}
-  ) {
+  function renderPreviewHtml(template: string, p: Place) {
     const filled = fillTemplate(
       template,
       businessInfoFromPlace(p),
       buildPreviewExtras(p)
     );
-    return options.locked ? injectMockPaywall(filled, p.name) : filled;
+    return filled;
   }
 
   function resetPreviewState() {
@@ -1023,7 +1018,7 @@ export default function SearchClient({
     if (ac.signal.aborted) return;
 
     setCurrentTemplate(html);
-    setPreviewHtml(renderPreviewHtml(html, p, { locked: true }));
+    setPreviewHtml(renderPreviewHtml(html, p));
     setPreviewModel("preview locked · gemini-3-flash-preview");
     setStreamingText("");
     setPreviewLoading(false);
@@ -1816,6 +1811,27 @@ export default function SearchClient({
                   sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                   className="preview-iframe"
                 />
+              )}
+              {mockPreviewLocked && previewHtml && !previewLoading && !previewError && (
+                <div className="stripe-paywall-layer" role="dialog" aria-modal="true" aria-label="Subscribe to access and generate websites">
+                  <div className="stripe-paywall-scrim" />
+                  <div className="stripe-paywall-card">
+                    <p className="stripe-paywall-kicker">Subscription required</p>
+                    <h2 className="stripe-paywall-title">Subscribe to access and generate websites</h2>
+                    <p className="stripe-paywall-sub">
+                      Keep generating new business websites, publishing client-ready pages, and reusing your workflow across leads.
+                    </p>
+                    <ul className="stripe-paywall-list">
+                      <li>Unlimited website generations</li>
+                      <li>Client-ready publishing links</li>
+                      <li>Use for every business lead</li>
+                    </ul>
+                    <a className="stripe-paywall-cta" href="/api/checkout">
+                      <span className="stripe-paywall-price">$12.99/month</span>
+                      <span className="stripe-paywall-note">Checkout with Stripe</span>
+                    </a>
+                  </div>
+                </div>
               )}
             </div>
           </div>
