@@ -12,11 +12,12 @@ export default async function Home() {
 
   const { data: row } = await supabase
     .from("user_api_keys")
-    .select("google_maps_api_key")
+    .select("google_maps_api_key, gemini_api_key")
     .eq("user_id", user.id)
     .maybeSingle();
 
   const mapsKey: string | null = row?.google_maps_api_key ?? null;
+  const geminiKey: string | null = row?.gemini_api_key ?? null;
 
   return (
     <div className="app-shell">
@@ -51,7 +52,7 @@ export default async function Home() {
           </div>
         </main>
       ) : (
-        <SearchClient mapsKey={mapsKey} />
+        <SearchClient mapsKey={mapsKey} geminiKey={geminiKey} />
       )}
     </div>
   );

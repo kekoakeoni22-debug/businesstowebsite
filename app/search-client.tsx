@@ -9,6 +9,11 @@ import {
   Pin,
   useMap,
 } from "@vis.gl/react-google-maps";
+import {
+  buildPrompt,
+  GEMINI_MODEL_CHAIN,
+  isQuotaOrAccessError,
+} from "@/lib/generate-site/prompt";
 
 type Place = {
   id: string;
@@ -120,7 +125,13 @@ function PanTo({ point }: { point: { lat: number; lng: number } | null }) {
   return null;
 }
 
-export default function SearchClient({ mapsKey }: { mapsKey: string }) {
+export default function SearchClient({
+  mapsKey,
+  geminiKey,
+}: {
+  mapsKey: string;
+  geminiKey: string | null;
+}) {
   const [query, setQuery] = useState("restaurants");
   const [location, setLocation] = useState("");
   const [locationDetected, setLocationDetected] = useState(false);
@@ -235,6 +246,15 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
   }
 
   async function generatePreview(p: Place) {
+    if (!geminiKey) {
+      setPreviewFor(p);
+      setPreviewError(
+        "No Gemini API key on file. Add one in Settings, then refresh."
+      );
+      setPreviewLoading(false);
+      return;
+    }
+
     previewAbortRef.current?.abort();
     const ac = new AbortController();
     previewAbortRef.current = ac;
@@ -245,64 +265,123 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
     setPreviewLoading(true);
     setStreamingText("");
 
-    try {
-      const r = await fetch("/api/generate-site", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: ac.signal,
-        body: JSON.stringify({
-          name: p.name,
-          primaryType: p.primaryType,
-          types: p.types,
-          address: p.address,
-          phone: p.phone,
-          rating: p.rating,
-          userRatingCount: p.userRatingCount,
-        }),
-      });
+    const prompt = buildPrompt({
+      name: p.name,
+      primaryType: p.primaryType,
+      types: p.types,
+      address: p.address,
+      phone: p.phone,
+      rating: p.rating,
+      userRatingCount: p.userRatingCount,
+    });
 
-      if (!r.ok) {
-        const text = await r.text();
-        let data: any = null;
-        try {
-          data = JSON.parse(text);
-        } catch {
-          /* not JSON */
+    const requestBody = JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.85,
+        topP: 0.95,
+        maxOutputTokens: 32768,
+        responseMimeType: "text/plain",
+      },
+    });
+
+    let lastErrorMsg = "Generation failed.";
+
+    for (const model of GEMINI_MODEL_CHAIN) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(
+          geminiKey
+        )}`;
+
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: ac.signal,
+          body: requestBody,
+        });
+
+        if (!r.ok) {
+          const text = await r.text();
+          let message = text;
+          try {
+            message = JSON.parse(text)?.error?.message || text;
+          } catch {
+            /* keep text */
+          }
+          lastErrorMsg = message;
+          if (isQuotaOrAccessError(r.status, message)) continue;
+          throw new Error(message);
         }
-        throw new Error(
-          data?.error || text.slice(0, 300) || `HTTP ${r.status}`
-        );
+
+        setPreviewModel(model);
+        if (!r.body) throw new Error("No response stream.");
+
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let accumulated = "";
+
+        const consumeLine = (line: string) => {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) return;
+          const data = trimmed.slice(5).trim();
+          if (!data) return;
+          try {
+            const json = JSON.parse(data);
+            const parts = json?.candidates?.[0]?.content?.parts;
+            if (Array.isArray(parts)) {
+              const t = parts
+                .map((part: any) => part?.text || "")
+                .join("");
+              if (t) {
+                accumulated += t;
+                setStreamingText(accumulated);
+              }
+            }
+          } catch {
+            /* skip malformed event */
+          }
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let nl: number;
+          while ((nl = buffer.indexOf("\n")) >= 0) {
+            const line = buffer.slice(0, nl);
+            buffer = buffer.slice(nl + 1);
+            consumeLine(line);
+          }
+        }
+        if (buffer.trim()) consumeLine(buffer);
+
+        if (!accumulated.trim()) throw new Error("Empty response from Gemini.");
+
+        let html = accumulated.trim();
+        const fence = /^```(?:html)?\s*([\s\S]*?)\s*```$/i.exec(html);
+        if (fence) html = fence[1].trim();
+
+        setPreviewHtml(html);
+        setStreamingText("");
+        setPreviewLoading(false);
+        return;
+      } catch (err: any) {
+        if (err?.name === "AbortError") return;
+        lastErrorMsg = err?.message || lastErrorMsg;
+        // Fall through to the next model only on retryable issues — the
+        // 4xx/quota cases that triggered `continue` already did so above.
+        // Any other error: stop trying.
+        setPreviewError(lastErrorMsg);
+        setPreviewLoading(false);
+        return;
       }
-
-      setPreviewModel(r.headers.get("X-Used-Model") || null);
-
-      if (!r.body) throw new Error("No response stream.");
-      const reader = r.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        accumulated += decoder.decode(value, { stream: true });
-        setStreamingText(accumulated);
-      }
-
-      if (!accumulated.trim()) throw new Error("Empty response from Gemini.");
-
-      // Strip markdown fences if Gemini wrapped its output despite instructions.
-      let html = accumulated.trim();
-      const fence = /^```(?:html)?\s*([\s\S]*?)\s*```$/i.exec(html);
-      if (fence) html = fence[1].trim();
-
-      setPreviewHtml(html);
-      setStreamingText("");
-    } catch (err: any) {
-      if (err?.name === "AbortError") return;
-      setPreviewError(err.message || "Generation failed");
-    } finally {
-      setPreviewLoading(false);
     }
+
+    setPreviewError(
+      `${lastErrorMsg} (tried: ${GEMINI_MODEL_CHAIN.join(", ")})`
+    );
+    setPreviewLoading(false);
   }
 
   // Auto-scroll the streaming code preview to follow the latest text.
