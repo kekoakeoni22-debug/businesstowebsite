@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import SearchClient from "./search-client";
@@ -25,11 +24,13 @@ export default async function Home() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
-  // The Maps JS embed runs in the browser, so the key has to be a NEXT_PUBLIC
-  // env var. The Gemini key stays server-side — it's only used by
-  // /api/generate-site (edge proxy) so it never reaches the browser.
+  // No sign-in wall anymore. Middleware auto-creates an anonymous Supabase
+  // session for first-time visitors so the search and publish flows work
+  // without auth. A real Google sign-in is still available via the header,
+  // and surfaces the user's email + Sign out once they upgrade.
+  const isAnonymous = !user || user.is_anonymous === true;
+
   const mapsKey: string | null =
     process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || null;
 
@@ -48,10 +49,16 @@ export default async function Home() {
           Business To Website AI
         </Link>
         <div className="app-user">
-          <span className="email muted">{user.email}</span>
-          <form action="/auth/signout" method="post">
-            <button className="btn-link" type="submit">Sign out</button>
-          </form>
+          {isAnonymous ? (
+            <Link href="/login">Sign in</Link>
+          ) : (
+            <>
+              <span className="email muted">{user!.email}</span>
+              <form action="/auth/signout" method="post">
+                <button className="btn-link" type="submit">Sign out</button>
+              </form>
+            </>
+          )}
         </div>
       </header>
 
