@@ -189,7 +189,6 @@ export default function SearchClient({
 
   // Sell-this-website popup
   const [sellFor, setSellFor] = useState<Place | null>(null);
-  const sellBlobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -525,21 +524,55 @@ export default function SearchClient({
 
   function closeSell() {
     setSellFor(null);
-    // Revoke the previous blob URL when closing so we don't leak memory if
-    // the user opens many sell modals in a row.
-    if (sellBlobUrlRef.current) {
-      URL.revokeObjectURL(sellBlobUrlRef.current);
-      sellBlobUrlRef.current = null;
-    }
   }
 
-  function openFilledWebsiteForPlace(p: Place) {
+  // Publishes the filled template to Supabase (one row in published_sites,
+  // keyed by a fresh UUID) and opens the resulting /site/<id> URL in a new
+  // tab. We pre-open the tab synchronously so popup blockers don't trip on
+  // the await chain.
+  async function openFilledWebsiteForPlace(p: Place) {
     if (!currentTemplate) return;
-    const html = fillTemplate(currentTemplate, businessInfoFromPlace(p));
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    sellBlobUrlRef.current = url;
-    window.open(url, "_blank", "noopener,noreferrer");
+
+    const newTab = window.open("about:blank", "_blank");
+    if (!newTab) {
+      // Popup blocked; nothing we can do other than fail loud.
+      // eslint-disable-next-line no-alert
+      alert("Pop-up was blocked. Allow pop-ups for this site and try again.");
+      return;
+    }
+
+    try {
+      const html = fillTemplate(currentTemplate, businessInfoFromPlace(p));
+
+      const supabase = createSupabaseBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        newTab.document.body.innerText = "Not signed in.";
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("published_sites")
+        .insert({
+          user_id: user.id,
+          html,
+          business_name: p.name,
+        })
+        .select("id")
+        .single();
+
+      if (error || !data?.id) {
+        newTab.document.body.innerText =
+          "Failed to publish: " + (error?.message || "no id returned");
+        return;
+      }
+
+      newTab.location.href = `${window.location.origin}/site/${data.id}`;
+    } catch (err: any) {
+      newTab.document.body.innerText = "Failed to publish: " + (err?.message || err);
+    }
   }
 
   useEffect(() => {
