@@ -509,7 +509,7 @@ export default function SearchClient({
   const [checkoutStarted, setCheckoutStarted] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
-  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [exportMenuFor, setExportMenuFor] = useState<string | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
   const streamCodeRef = useRef<HTMLPreElement | null>(null);
 
@@ -1307,20 +1307,25 @@ export default function SearchClient({
   }, [streamingText]);
 
   function closePreview() {
-    setExportMenuOpen(false);
+    setExportMenuFor(null);
     resetPreviewState();
   }
 
-  function downloadPreviewSource() {
-    if (!previewHtml || !previewFor) return;
-    const blob = new Blob([previewHtml], { type: "text/html;charset=utf-8" });
+  function downloadSourceForPlace(p: Place) {
+    if (!currentTemplate) return;
+    const html = fillTemplate(
+      currentTemplate,
+      businessInfoFromPlace(p),
+      buildPreviewExtras(p)
+    );
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${slugifyBusinessName(previewFor.name)}.html`;
+    a.download = `${slugifyBusinessName(p.name)}.html`;
     a.click();
     URL.revokeObjectURL(url);
-    setExportMenuOpen(false);
+    setExportMenuFor(null);
   }
 
 
@@ -1662,24 +1667,34 @@ export default function SearchClient({
                     )}
                     <div className="result-actions">
                       {currentTemplate ? (
-                        <button
-                          type="button"
-                          className="action-sell"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            copyWebsiteUrl(p);
-                          }}
-                        >
-                          {copiedFor === p.id ? (
-                            <>
-                              <CheckIcon /> Copied!
-                            </>
-                          ) : (
-                            <>
-                              <GlobeIcon /> Copy website URL
-                            </>
+                        <div className="result-export">
+                          <button
+                            type="button"
+                            className="action-sell"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExportMenuFor((curr) => (curr === p.id ? null : p.id));
+                            }}
+                          >
+                            <GlobeIcon /> Export website
+                          </button>
+                          {exportMenuFor === p.id && (
+                            <div className="result-export-menu" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => copyWebsiteUrl(p)}
+                              >
+                                {copiedFor === p.id ? "Copied!" : "Copy demo URL"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => downloadSourceForPlace(p)}
+                              >
+                                Download source
+                              </button>
+                            </div>
                           )}
-                        </button>
+                        </div>
                       ) : (
                         <button
                           type="button"
@@ -1808,41 +1823,6 @@ export default function SearchClient({
         >
           <div className="preview-window">
             <div className="preview-body">
-              {previewHtml && !previewLoading && !previewError && (
-                <div className="preview-corner-actions">
-                  <button
-                    type="button"
-                    className="export-btn"
-                    onClick={() => setExportMenuOpen((v) => !v)}
-                  >
-                    Export website
-                  </button>
-                  {exportMenuOpen && (
-                    <div className="export-menu">
-                      <button
-                        type="button"
-                        onClick={() => copyWebsiteUrl(previewFor)}
-                      >
-                        Copy demo URL
-                      </button>
-                      <button
-                        type="button"
-                        onClick={downloadPreviewSource}
-                      >
-                        Download source
-                      </button>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    className="preview-close-btn"
-                    onClick={closePreview}
-                    aria-label="Close"
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
               {previewLoading && (
                 <div className="preview-generating">
                   <div className="spark-pulse">

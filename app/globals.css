@@ -544,6 +544,38 @@ button {
   filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.45));
 }
 
+.result-export {
+  position: relative;
+}
+
+.result-export-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 170px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  z-index: 20;
+}
+
+.result-export-menu button {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: #fff;
+  font-size: 13px;
+  color: #0f172a;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.result-export-menu button:hover {
+  background: #f8fafc;
+}
+
 /* ========== Website preview overlay ========== */
 /* Positioned absolutely inside .app-map so the left sidebar stays visible
    and interactive while the preview is open. */
@@ -589,63 +621,6 @@ button {
   position: relative;
   background: #fff;
   overflow: hidden;
-}
-
-.preview-corner-actions {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 12;
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.export-btn,
-.preview-close-btn {
-  border: 1px solid rgba(15, 23, 42, 0.14);
-  background: rgba(255, 255, 255, 0.96);
-  color: #0f172a;
-  border-radius: 8px;
-  height: 34px;
-  padding: 0 12px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.preview-close-btn {
-  width: 34px;
-  padding: 0;
-  font-size: 20px;
-  line-height: 1;
-}
-
-.export-menu {
-  position: absolute;
-  top: 38px;
-  right: 44px;
-  width: 170px;
-  border-radius: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: #fff;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-  overflow: hidden;
-}
-
-.export-menu button {
-  width: 100%;
-  text-align: left;
-  border: 0;
-  background: #fff;
-  font-size: 13px;
-  color: #0f172a;
-  padding: 10px 12px;
-  cursor: pointer;
-}
-
-.export-menu button:hover {
-  background: #f8fafc;
 }
 
 .preview-iframe {
