@@ -27,6 +27,7 @@ type Place = {
   types?: string[];
   lat?: number;
   lng?: number;
+  photos?: string[];
 };
 
 function formatType(t?: string) {
@@ -273,6 +274,7 @@ export default function SearchClient({
       phone: p.phone,
       rating: p.rating,
       userRatingCount: p.userRatingCount,
+      photos: p.photos,
     });
 
     const requestBody = JSON.stringify({
@@ -517,6 +519,18 @@ export default function SearchClient({
                     ref={(el) => { cardRefs.current[p.id] = el; }}
                     onClick={() => focusOnPlace(p)}
                   >
+                    {p.photos && p.photos.length > 0 && (
+                      <div className="result-thumb">
+                        <img
+                          src={p.photos[0]}
+                          alt={`${p.name} photo`}
+                          loading="lazy"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).parentElement?.remove();
+                          }}
+                        />
+                      </div>
+                    )}
                     <div className="result-head">
                       <h2 className="result-name">{p.name}</h2>
                       {!p.websiteUri && (

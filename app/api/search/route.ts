@@ -28,8 +28,29 @@ const FIELD_MASK = [
   "places.primaryType",
   "places.types",
   "places.location",
+  "places.photos",
   "nextPageToken",
 ].join(",");
+
+// Max photos per place to surface to the client. The Places Photo API charges
+// per image *load*, so we keep this modest. Hero + a small gallery is enough.
+const MAX_PHOTOS_PER_PLACE = 6;
+const PHOTO_MAX_WIDTH = 1600;
+
+function buildPhotoUrls(rawPhotos: any[], apiKey: string): string[] {
+  if (!Array.isArray(rawPhotos)) return [];
+  const urls: string[] = [];
+  for (const ph of rawPhotos.slice(0, MAX_PHOTOS_PER_PLACE)) {
+    const name: string | undefined = ph?.name;
+    if (!name) continue;
+    // Photo "name" is already a Places resource path like
+    // "places/CHIJ.../photos/ATplDJ...". Append /media and the key.
+    urls.push(
+      `https://places.googleapis.com/v1/${name}/media?maxWidthPx=${PHOTO_MAX_WIDTH}&key=${encodeURIComponent(apiKey)}`
+    );
+  }
+  return urls;
+}
 
 type Payload = {
   textQuery: string;
@@ -181,6 +202,7 @@ export async function POST(req: Request) {
       typeof p.location?.longitude === "number"
         ? p.location.longitude
         : undefined,
+    photos: buildPhotoUrls(p.photos || [], apiKey),
   }));
 
   const filtered = filterNoWebsite
