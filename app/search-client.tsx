@@ -324,8 +324,8 @@ export default function SearchClient({
 
   // Photo proxy URLs from the search API look like:
   //   https://app.example.com/api/photo/places/<id>/photos/<ref>?w=1600
-  // Pull just the part after /api/photo/ so we can request the resolved
-  // signed-CDN URL at /api/photo-data/... for the published site.
+  // Pull just the part after /api/photo/ so we can request the data-URL
+  // variant at /api/photo-data/... for the published site.
   function extractPhotoPath(proxyUrl: string): string | null {
     try {
       const u = new URL(proxyUrl);
@@ -362,26 +362,43 @@ export default function SearchClient({
     return extras;
   }
 
-  // Extras for publishing: resolve every photo's proxy URL to its signed
-  // Google CDN URL so the published HTML doesn't depend on our /api/photo
-  // route (which requires auth). The URLs are public for the lifetime of
-  // their signed token — long enough for the sale-demo use case.
-  async function buildPublishExtras(p: Place): Promise<FillExtras> {
+  // Extras for publishing: fetch every photo as a base64 data URL so the
+  // published HTML is self-contained — visitors don't need auth to load
+  // images and the page survives Google CDN signed-URL expiry. Width is
+  // 800px so six photos don't blow up the HTML size on insert.
+  async function buildPublishExtras(p: Place): Promise<{
+    extras: FillExtras;
+    failures: string[];
+  }> {
     const extras: FillExtras = {};
+    const failures: string[] = [];
 
     const photoPaths = (p.photos || [])
       .slice(0, 6)
       .map(extractPhotoPath)
       .filter((s): s is string => !!s);
 
-    const photoPromises = photoPaths.map((path) =>
-      fetch(`/api/photo-data/${path}?w=1200`)
-        .then((r) => (r.ok ? r.text() : null))
-        .catch(() => null)
-    );
+    const photoPromises = photoPaths.map(async (path, i) => {
+      try {
+        const r = await fetch(`/api/photo-data/${path}?w=800`);
+        if (!r.ok) {
+          const msg = await r.text().catch(() => "");
+          failures.push(`Photo ${i + 1}: HTTP ${r.status} ${msg.slice(0, 120)}`);
+          return null;
+        }
+        const text = await r.text();
+        if (!text.startsWith("data:")) {
+          failures.push(`Photo ${i + 1}: response wasn't a data URL`);
+          return null;
+        }
+        return text;
+      } catch (e: any) {
+        failures.push(`Photo ${i + 1}: ${e?.message || e}`);
+        return null;
+      }
+    });
 
     const photoDataUrls = await Promise.all(photoPromises);
-
     photoDataUrls.forEach((url, i) => {
       if (url) (extras as any)[`PHOTO_${i + 1}`] = url;
     });
@@ -390,7 +407,7 @@ export default function SearchClient({
     // server fetch needed. Same URL works for preview and published HTML.
     const embed = buildMapEmbedUrl(p);
     if (embed) extras.MAP_EMBED_URL = embed;
-    return extras;
+    return { extras, failures };
   }
 
   async function generatePreview(p: Place, forceRegenerate = false) {
@@ -640,12 +657,16 @@ export default function SearchClient({
     }
 
     try {
-      // Build self-contained HTML: photos use signed Google CDN URLs (no
-      // /api/photo auth needed when a visitor loads /site/<slug>) and the
-      // map is a public Google Maps embed iframe (also no API key).
+      // Build self-contained HTML: every photo becomes a base64 data: URL
+      // so the published /site/<slug> page works even after Google's signed
+      // CDN URLs expire. The map is a public Google Maps embed iframe.
       newTab.document.body.innerHTML =
         "<p style='font-family:sans-serif;padding:2rem'>Building your site…</p>";
-      const extras = await buildPublishExtras(p);
+      const { extras, failures } = await buildPublishExtras(p);
+      if (failures.length > 0) {
+        // eslint-disable-next-line no-console
+        console.warn("Photo-data failures while publishing:", failures);
+      }
       const html = fillTemplate(
         currentTemplate,
         businessInfoFromPlace(p),
