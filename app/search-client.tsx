@@ -256,8 +256,30 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
           userRatingCount: p.userRatingCount,
         }),
       });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || "Generation failed");
+
+      const rawText = await r.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        /* not JSON — likely an upstream timeout/HTML error page */
+      }
+
+      if (!r.ok) {
+        if (r.status === 504 || r.status === 502) {
+          throw new Error(
+            "Generation timed out. Gemini took longer than the server allows. Try again — subsequent runs often succeed."
+          );
+        }
+        throw new Error(
+          data?.error ||
+            rawText.slice(0, 200) ||
+            `Generation failed (HTTP ${r.status}).`
+        );
+      }
+      if (!data?.html) {
+        throw new Error("Server returned no HTML.");
+      }
       setPreviewHtml(data.html);
       setPreviewModel(data.model || null);
     } catch (err: any) {

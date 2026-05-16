@@ -70,19 +70,11 @@ STOCK PHOTOS (USE WHEN APPROPRIATE)
 - Use 1 large hero image, plus 2–4 supporting images in a gallery or feature section. Use \`loading="lazy"\` for non-hero images. Use \`onerror="this.style.display='none'"\` so a failed image never breaks the layout.
 - If the business type is one where photos add little (e.g. lawyer, accountant), favor gradients, illustrations, and inline SVG illustrations over stock photos.
 
-SECTIONS TO INCLUDE
-1. Sticky transparent-to-solid header with business name as logo (you may add a small inline SVG mark) and nav links: About, Services (or Menu), Gallery, Contact.
-2. Hero: large headline, supporting subheadline, two CTAs (primary: phone link \`tel:${b.phone || ""}\`; secondary: scroll to services). Background hero image with a tasteful dark gradient overlay so text is readable.
-3. About: 2–3 paragraphs of warm, on-brand copy.
-4. Services / Menu / Offerings: 3–6 cards with icon, name, short description, and optionally price.
-5. Gallery: 3–6 images in a tight grid.
-6. Reviews quote: 1–3 short fabricated-but-plausible review quotes with attribution to first names.
-7. Contact + footer: address (Google Maps deep link), phone link, hours, copyright.
+SECTIONS
+Sticky header (name as logo, nav: About / Services or Menu / Gallery / Contact) → Hero with image, headline, subheadline, two CTAs (primary: \`tel:${b.phone || ""}\`) → About (2–3 paragraphs) → Services/Menu (3–6 cards with inline SVG icon + name + short description + optional price) → Gallery (3–6 images) → 1–2 review quotes → Contact + footer with phone link, address (Google Maps deep link), hours, copyright.
 
 ACCESSIBILITY
-- All images have descriptive alt text.
-- Color contrast meets WCAG AA on text.
-- Skip-to-content link not required but semantic landmarks (<header>, <main>, <section>, <footer>) are.
+Descriptive alt text on every image. WCAG-AA color contrast. Semantic landmarks (<header>, <main>, <section>, <footer>).
 
 OUTPUT FORMAT
 Output ONLY the HTML document, starting with \`<!doctype html>\`. No prose, no markdown, no \`\`\`html fences. Do not wrap the output in any other content.`;
@@ -156,7 +148,7 @@ export async function POST(req: Request) {
           generationConfig: {
             temperature: 0.85,
             topP: 0.95,
-            maxOutputTokens: 16384,
+            maxOutputTokens: 8192,
             responseMimeType: "text/plain",
           },
         }),
