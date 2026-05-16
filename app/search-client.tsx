@@ -15,6 +15,7 @@ import {
   GEMINI_MODEL_CHAIN,
   isQuotaOrAccessError,
   type BusinessInfo,
+  type FillExtras,
 } from "@/lib/generate-site/prompt";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -295,7 +296,7 @@ export default function SearchClient({
     }
     const info = businessInfoFromPlace(p);
     setPreviewFor(p);
-    setPreviewHtml(fillTemplate(currentTemplate, info));
+    setPreviewHtml(fillTemplate(currentTemplate, info, buildPreviewExtras(p)));
     setPreviewError(null);
   }
 
@@ -311,6 +312,78 @@ export default function SearchClient({
       hours: p.hours,
       query: query,
     };
+  }
+
+  // Photo proxy URLs from the search API look like:
+  //   https://app.example.com/api/photo/places/<id>/photos/<ref>?w=1600
+  // Pull just the part after /api/photo/ so we can request the data-URL
+  // variant at /api/photo-data/...
+  function extractPhotoPath(proxyUrl: string): string | null {
+    try {
+      const u = new URL(proxyUrl);
+      const m = u.pathname.match(/^\/api\/photo\/(.+)$/);
+      return m ? m[1] : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Fast extras for in-iframe previews: use the proxy/direct URLs we
+  // already have. No extra fetching needed.
+  function buildPreviewExtras(p: Place): FillExtras {
+    const extras: FillExtras = {};
+    (p.photos || []).slice(0, 6).forEach((url, i) => {
+      (extras as any)[`PHOTO_${i + 1}`] = url;
+    });
+    if (
+      mapsKey &&
+      typeof p.lat === "number" &&
+      typeof p.lng === "number"
+    ) {
+      extras.MAP_IMAGE =
+        `https://maps.googleapis.com/maps/api/staticmap` +
+        `?center=${p.lat},${p.lng}` +
+        `&zoom=15&size=800x400&scale=2` +
+        `&markers=color:red%7C${p.lat},${p.lng}` +
+        `&key=${encodeURIComponent(mapsKey)}`;
+    }
+    return extras;
+  }
+
+  // Slow extras for publishing: fetch every photo + the static map as
+  // base64 data URLs server-side, so the published HTML is fully
+  // self-contained and doesn't depend on signed Google CDN URLs.
+  async function buildPublishExtras(p: Place): Promise<FillExtras> {
+    const extras: FillExtras = {};
+
+    const photoPaths = (p.photos || [])
+      .slice(0, 6)
+      .map(extractPhotoPath)
+      .filter((s): s is string => !!s);
+
+    const photoPromises = photoPaths.map((path) =>
+      fetch(`/api/photo-data/${path}?w=1200`)
+        .then((r) => (r.ok ? r.text() : null))
+        .catch(() => null)
+    );
+
+    const mapPromise =
+      typeof p.lat === "number" && typeof p.lng === "number"
+        ? fetch(`/api/static-map-data?lat=${p.lat}&lng=${p.lng}`)
+            .then((r) => (r.ok ? r.text() : null))
+            .catch(() => null)
+        : Promise.resolve(null);
+
+    const [photoDataUrls, mapDataUrl] = await Promise.all([
+      Promise.all(photoPromises),
+      mapPromise,
+    ]);
+
+    photoDataUrls.forEach((url, i) => {
+      if (url) (extras as any)[`PHOTO_${i + 1}`] = url;
+    });
+    if (mapDataUrl) extras.MAP_IMAGE = mapDataUrl;
+    return extras;
   }
 
   async function generatePreview(p: Place, forceRegenerate = false) {
@@ -340,7 +413,11 @@ export default function SearchClient({
 
       if (cached?.html_template) {
         try {
-          const filled = fillTemplate(cached.html_template, info);
+          const filled = fillTemplate(
+            cached.html_template,
+            info,
+            buildPreviewExtras(p)
+          );
           setCurrentTemplate(cached.html_template);
           setPreviewHtml(filled);
           setPreviewModel(`template · ${cached.model || "saved"}`);
@@ -478,7 +555,7 @@ export default function SearchClient({
           console.warn("Failed to save template:", saveErr.message);
         }
 
-        const filled = fillTemplate(templateHtml, info);
+        const filled = fillTemplate(templateHtml, info, buildPreviewExtras(p));
         setCurrentTemplate(templateHtml);
         setPreviewHtml(filled);
         setPreviewModel(`new · ${model}`);
@@ -556,7 +633,17 @@ export default function SearchClient({
     }
 
     try {
-      const html = fillTemplate(currentTemplate, businessInfoFromPlace(p));
+      // Build self-contained HTML: every image/map becomes a data: URL so
+      // the published /site/<slug> page works even if our /api/photo or
+      // Google CDN expires/changes later.
+      newTab.document.body.innerHTML =
+        "<p style='font-family:sans-serif;padding:2rem'>Building your site…</p>";
+      const extras = await buildPublishExtras(p);
+      const html = fillTemplate(
+        currentTemplate,
+        businessInfoFromPlace(p),
+        extras
+      );
 
       const supabase = createSupabaseBrowserClient();
       const {

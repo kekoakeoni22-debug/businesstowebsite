@@ -10,6 +10,19 @@ export type BusinessInfo = {
   query?: string;
 };
 
+// Extra fill data — image/map URLs the template's gallery and map sections
+// reference. Any of these can be absent; conditional blocks in the template
+// will hide their containers when the value is missing.
+export type FillExtras = {
+  PHOTO_1?: string;
+  PHOTO_2?: string;
+  PHOTO_3?: string;
+  PHOTO_4?: string;
+  PHOTO_5?: string;
+  PHOTO_6?: string;
+  MAP_IMAGE?: string;
+};
+
 const STOPWORDS = new Set([
   "near", "me", "in", "the", "best", "top", "good", "great", "open", "now",
   "with", "and", "for", "of", "to", "a", "an", "on", "at", "by", "this",
@@ -97,11 +110,55 @@ HARD REQUIREMENTS
 HERO IMAGE
 The hero must use <img src="{{HERO_PHOTO_URL}}" ... /> as its background or large adjacent image. Place with onerror="this.style.display='none'" and back the hero section with a CSS gradient underneath so the layout holds if the photo fails. Dark linear-gradient overlay on top so headline text stays readable.
 
-EVERY OTHER SECTION
-No other photographic images on the page. Zero <img> tags outside the hero. Use inline-SVG illustrations, color-blocked sections backed by CSS gradients, typographic blockquotes, and icon-driven feature cards.
+CONDITIONAL BLOCK SYNTAX
+
+The template engine supports hide-when-empty blocks with this exact syntax:
+  {{#KEY}}content{{/KEY}}
+If KEY has data at fill time, the inner content renders. If KEY is empty, the whole block (and everything inside it) is removed. Use it for the gallery and map sections below so they vanish cleanly when no data is available.
+
+PHOTO GALLERY (INCLUDE — WRAPPED CONDITIONALLY)
+
+After Services/Menu, add a "Gallery" or "Our Space" section that shows up to 6 real business photos in a responsive grid. Wrap the entire section in {{#PHOTO_1}}...{{/PHOTO_1}} so it only renders when at least one photo is provided. Inside, render photo 1 unconditionally (we're already inside its block) and wrap photos 2–6 in their own conditional blocks:
+
+{{#PHOTO_1}}
+<section class="gallery">
+  <h2>Our Space</h2>
+  <div class="gallery-grid">
+    <img class="gallery-img" src="{{PHOTO_1}}" alt="{{BUSINESS_NAME}} photo 1" loading="lazy" />
+    {{#PHOTO_2}}<img class="gallery-img" src="{{PHOTO_2}}" alt="{{BUSINESS_NAME}} photo 2" loading="lazy" />{{/PHOTO_2}}
+    {{#PHOTO_3}}<img class="gallery-img" src="{{PHOTO_3}}" alt="{{BUSINESS_NAME}} photo 3" loading="lazy" />{{/PHOTO_3}}
+    {{#PHOTO_4}}<img class="gallery-img" src="{{PHOTO_4}}" alt="{{BUSINESS_NAME}} photo 4" loading="lazy" />{{/PHOTO_4}}
+    {{#PHOTO_5}}<img class="gallery-img" src="{{PHOTO_5}}" alt="{{BUSINESS_NAME}} photo 5" loading="lazy" />{{/PHOTO_5}}
+    {{#PHOTO_6}}<img class="gallery-img" src="{{PHOTO_6}}" alt="{{BUSINESS_NAME}} photo 6" loading="lazy" />{{/PHOTO_6}}
+  </div>
+</section>
+{{/PHOTO_1}}
+
+Style \`.gallery-grid\` as a responsive grid (e.g. \`display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;\`) and \`.gallery-img\` cover-fit (e.g. \`width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px;\`). The grid must look intentional whether 1 or 6 photos render.
+
+LOCATION MAP (INCLUDE — WRAPPED CONDITIONALLY)
+
+Just above the contact/footer, add a "Visit us" or "Find us" section with a static map image. Wrap the entire section in {{#MAP_IMAGE}}...{{/MAP_IMAGE}} so it vanishes if no map data is provided:
+
+{{#MAP_IMAGE}}
+<section class="map-section">
+  <h2>Visit us</h2>
+  <img class="location-map" src="{{MAP_IMAGE}}" alt="Map showing the location of {{BUSINESS_NAME}}" />
+  <p class="address-under-map"><a href="{{ADDRESS_MAPS_URL}}" target="_blank" rel="noreferrer">{{ADDRESS}}</a></p>
+</section>
+{{/MAP_IMAGE}}
+
+Style \`.location-map\` as \`width: 100%; max-width: 720px; border-radius: 12px; display: block; margin: 0 auto;\`.
+
+OTHER IMAGES
+The ONLY <img> tags allowed on the page are:
+- 1 hero <img> with src="{{HERO_PHOTO_URL}}"
+- 1–6 gallery <img>s inside the gallery section above
+- 1 location-map <img> inside the map section above
+For decorative imagery (icons, dividers, feature-card glyphs), use inline SVGs only — never an extra <img> tag.
 
 SECTIONS
-Sticky header (with {{BUSINESS_NAME}} logo, nav: About / Services or Menu / Contact) → Hero (uses {{HERO_PHOTO_URL}}, headline mentioning {{BUSINESS_NAME}}, two CTAs primary <a href="tel:{{PHONE}}">) → About (2–3 paragraphs mentioning {{BUSINESS_NAME}}) → Services / Menu (3–6 cards) → 1–2 review quotes → Contact + footer (use <a href="tel:{{PHONE}}">{{PHONE}}</a>, <a href="{{ADDRESS_MAPS_URL}}">{{ADDRESS}}</a>, <ul class="hours">{{HOURS_LIST}}</ul>, and a footer copyright line "© <year> {{BUSINESS_NAME}}").
+Sticky header (with {{BUSINESS_NAME}} logo, nav: About / Services or Menu / Gallery / Contact) → Hero (uses {{HERO_PHOTO_URL}}, headline mentioning {{BUSINESS_NAME}}, two CTAs primary <a href="tel:{{PHONE}}">) → About (2–3 paragraphs mentioning {{BUSINESS_NAME}}) → Services / Menu (3–6 cards) → Gallery (conditional, as specified above) → 1–2 review quotes → Map (conditional, as specified above) → Contact + footer (use <a href="tel:{{PHONE}}">{{PHONE}}</a>, <a href="{{ADDRESS_MAPS_URL}}">{{ADDRESS}}</a>, <ul class="hours">{{HOURS_LIST}}</ul>, footer copyright "© <year> {{BUSINESS_NAME}}").
 
 ACCESSIBILITY
 Descriptive alt text on the hero image. WCAG-AA color contrast. Semantic landmarks (<header>, <main>, <section>, <footer>).
@@ -146,7 +203,11 @@ function buildMapsUrl(name: string, address: string): string {
   )}`;
 }
 
-export function fillTemplate(template: string, b: BusinessInfo): string {
+export function fillTemplate(
+  template: string,
+  b: BusinessInfo,
+  extras: FillExtras = {}
+): string {
   const name = b.name || "";
   const phone = b.phone || "";
   const address = b.address || "";
@@ -156,21 +217,50 @@ export function fillTemplate(template: string, b: BusinessInfo): string {
       ? b.userRatingCount.toLocaleString()
       : "";
 
-  const replacements: Record<string, string> = {
-    "{{BUSINESS_NAME}}": escapeHtml(name),
-    "{{PHONE}}": escapeHtml(phone),
-    "{{ADDRESS}}": escapeHtml(address),
-    "{{ADDRESS_MAPS_URL}}": buildMapsUrl(name, address),
-    "{{RATING}}": escapeHtml(rating),
-    "{{REVIEW_COUNT}}": escapeHtml(reviewCount),
-    "{{HOURS_LIST}}": buildHoursListHtml(b.hours || []),
-    "{{HERO_PHOTO_URL}}": buildHeroPhotoUrl(b),
+  // All placeholder values. Empty string for absent extras so conditional
+  // blocks correctly recognize them as "missing".
+  const values: Record<string, string> = {
+    BUSINESS_NAME: escapeHtml(name),
+    PHONE: escapeHtml(phone),
+    ADDRESS: escapeHtml(address),
+    ADDRESS_MAPS_URL: buildMapsUrl(name, address),
+    RATING: escapeHtml(rating),
+    REVIEW_COUNT: escapeHtml(reviewCount),
+    HOURS_LIST: buildHoursListHtml(b.hours || []),
+    HERO_PHOTO_URL: buildHeroPhotoUrl(b),
+    PHOTO_1: extras.PHOTO_1 || "",
+    PHOTO_2: extras.PHOTO_2 || "",
+    PHOTO_3: extras.PHOTO_3 || "",
+    PHOTO_4: extras.PHOTO_4 || "",
+    PHOTO_5: extras.PHOTO_5 || "",
+    PHOTO_6: extras.PHOTO_6 || "",
+    MAP_IMAGE: extras.MAP_IMAGE || "",
   };
 
+  // 1) Strip conditional blocks {{#KEY}}...{{/KEY}} whose key is missing.
+  //    Iterate to handle nested blocks (different keys nested in each other).
   let html = template;
-  for (const [token, value] of Object.entries(replacements)) {
-    html = html.split(token).join(value);
+  for (let i = 0; i < 6; i++) {
+    const next = html.replace(
+      /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
+      (_match, key: string, content: string) => {
+        const v = values[key];
+        return v && v.length > 0 ? content : "";
+      }
+    );
+    if (next === html) break;
+    html = next;
   }
+
+  // 2) Substitute remaining {{KEY}} placeholders.
+  for (const [key, value] of Object.entries(values)) {
+    html = html.split(`{{${key}}}`).join(value);
+  }
+
+  // 3) Strip any orphan {{...}} that we don't know about so they don't
+  //    appear as literal text in the rendered page.
+  html = html.replace(/\{\{\w+\}\}/g, "");
+
   return html;
 }
 
@@ -179,6 +269,7 @@ export function fillTemplate(template: string, b: BusinessInfo): string {
 // ============================================================================
 
 export const GEMINI_MODEL_CHAIN = [
+  "gemini-3-flash-preview",
   "gemini-2.5-pro",
   "gemini-2.5-flash",
 ] as const;
