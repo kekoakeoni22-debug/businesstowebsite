@@ -1124,7 +1124,12 @@ export default function SearchClient({
                 <iframe
                   title={`Generated website for ${previewFor.name}`}
                   srcDoc={previewHtml}
-                  sandbox="allow-scripts"
+                  // allow-same-origin is required so the nested Google Maps
+                  // embed iframe can load its own subresources (without it
+                  // both frames are treated as null-origin and Maps blocks
+                  // its own internal navigation). allow-popups lets links
+                  // open in new tabs.
+                  sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                   className="preview-iframe"
                 />
               )}
