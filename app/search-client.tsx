@@ -1149,6 +1149,7 @@ export default function SearchClient({
       const { data: cached } = await supabase
         .from("site_templates")
         .select("html_template, model")
+        .eq("user_id", user.id)
         .eq("primary_type", primaryType)
         .maybeSingle();
 

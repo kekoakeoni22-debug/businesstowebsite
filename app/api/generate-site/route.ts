@@ -14,6 +14,24 @@ function jsonError(status: number, message: string) {
   });
 }
 
+function isPaidUser(user: any): boolean {
+  const appMeta = user?.app_metadata || {};
+  const userMeta = user?.user_metadata || {};
+  const fromMetadata =
+    appMeta?.btw_pro === true ||
+    appMeta?.is_pro === true ||
+    userMeta?.btw_pro === true ||
+    userMeta?.is_pro === true;
+
+  const allowlist = (process.env.PRO_USER_IDS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const fromAllowlist = allowlist.includes(user?.id || "");
+
+  return fromMetadata || fromAllowlist;
+}
+
 export async function POST(req: NextRequest) {
   // Sign-in is required for Gemini generation specifically — every call to
   // this route costs us tokens, so we gate it behind an account. Search,
@@ -23,6 +41,12 @@ export async function POST(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return jsonError(401, "Sign in required to generate a website.");
+  if (!isPaidUser(user)) {
+    return jsonError(
+      402,
+      "Pro subscription required to generate websites."
+    );
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -38,6 +62,26 @@ export async function POST(req: NextRequest) {
 
   const primaryType = (body.primaryType || "business").trim();
   const model = (body.model || "gemini-3-flash-preview").trim();
+
+  // Charge credits only when we are about to call Gemini (fresh generation).
+  const { data: creditRows, error: creditErr } = await supabase.rpc(
+    "consume_generation_credits",
+    {
+      p_user_id: user.id,
+      p_cost: 100,
+      p_monthly: 4000,
+    }
+  );
+  if (creditErr) {
+    return jsonError(500, `Credit system error: ${creditErr.message}`);
+  }
+  const creditResult = Array.isArray(creditRows) ? creditRows[0] : null;
+  if (!creditResult?.ok) {
+    return jsonError(
+      402,
+      `Insufficient credits. ${creditResult?.credits_remaining ?? 0} credits remaining.`
+    );
+  }
 
   const prompt = buildTemplatePrompt(primaryType);
   const upstreamBody = JSON.stringify({
