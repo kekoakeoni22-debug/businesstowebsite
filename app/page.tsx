@@ -1,9 +1,26 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import SearchClient from "./search-client";
 
 export default async function Home() {
+  const h = await headers();
+  // Vercel injects geo headers on every request. Use the city as a default
+  // location so the search box is pre-filled without waiting on browser
+  // geolocation (which requires a permission prompt the user may decline).
+  const ipCity = h.get("x-vercel-ip-city");
+  const ipRegion = h.get("x-vercel-ip-country-region");
+  const ipLat = h.get("x-vercel-ip-latitude");
+  const ipLng = h.get("x-vercel-ip-longitude");
+  const defaultLocation = ipCity
+    ? `${decodeURIComponent(ipCity)}${ipRegion ? `, ${ipRegion}` : ""}`
+    : "";
+  const defaultCoords =
+    ipLat && ipLng
+      ? { lat: parseFloat(ipLat), lng: parseFloat(ipLng) }
+      : null;
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -52,7 +69,12 @@ export default async function Home() {
           </div>
         </main>
       ) : (
-        <SearchClient mapsKey={mapsKey} geminiKey={geminiKey} />
+        <SearchClient
+          mapsKey={mapsKey}
+          geminiKey={geminiKey}
+          defaultLocation={defaultLocation}
+          defaultCoords={defaultCoords}
+        />
       )}
     </div>
   );

@@ -156,15 +156,23 @@ function PanTo({ point }: { point: { lat: number; lng: number } | null }) {
 export default function SearchClient({
   mapsKey,
   geminiKey,
+  defaultLocation,
+  defaultCoords,
 }: {
   mapsKey: string;
   geminiKey: string | null;
+  defaultLocation: string;
+  defaultCoords: { lat: number; lng: number } | null;
 }) {
-  const [query, setQuery] = useState("restaurants");
-  const [location, setLocation] = useState("");
-  const [locationDetected, setLocationDetected] = useState(false);
+  const [query, setQuery] = useState("");
+  const [location, setLocation] = useState(defaultLocation);
+  const [locationDetected, setLocationDetected] = useState(
+    defaultLocation.length > 0
+  );
   const [filterNoWebsite, setFilterNoWebsite] = useState(true);
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    defaultCoords
+  );
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<Place[] | null>(null);
   const [totalBeforeFilter, setTotalBeforeFilter] = useState(0);
@@ -930,6 +938,9 @@ export default function SearchClient({
             defaultZoom={defaultZoom}
             gestureHandling="greedy"
             disableDefaultUI={false}
+            mapTypeControl={false}
+            streetViewControl={false}
+            fullscreenControl={false}
             clickableIcons={false}
             style={{ width: "100%", height: "100%" }}
           >
