@@ -735,9 +735,11 @@ export default function SearchClient({
     setCurrentTemplate(null);
     setPreviewModel("generating · gemini-3-flash-preview");
 
-    // Pull a template to stream. Prefer the matching primary_type so it
-    // feels appropriate to the business; fall back to any row in the
-    // table, then to the hardcoded sample if the table is empty.
+    // Pull a template to stream. Priority:
+    //   1. site_templates row matching this primary_type (per-type cache)
+    //   2. fallback_mock_template — the single shared template for any
+    //      business type that doesn't have its own row yet
+    //   3. the hardcoded sample in this file (last-resort, table empty)
     const supabase = createSupabaseBrowserClient();
     const primaryType = p.primaryType || "business";
     let html: string | null = null;
@@ -749,12 +751,11 @@ export default function SearchClient({
     if (matched?.html_template) {
       html = matched.html_template;
     } else {
-      const { data: anyRow } = await supabase
-        .from("site_templates")
+      const { data: fallback } = await supabase
+        .from("fallback_mock_template")
         .select("html_template")
-        .limit(1)
         .maybeSingle();
-      html = anyRow?.html_template || FALLBACK_MOCK_HTML;
+      html = fallback?.html_template || FALLBACK_MOCK_HTML;
     }
 
     // Stream in ~60 chunks across ~6 seconds regardless of HTML length so
