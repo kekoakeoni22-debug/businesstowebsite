@@ -608,34 +608,75 @@ button {
 .preview-generating-sub {
   font-size: 0.9rem;
   color: var(--gm-text-secondary);
-  max-width: 420px;
+  max-width: 520px;
   line-height: 1.5;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
-.shimmer-bar {
-  width: 240px;
-  height: 4px;
-  background: #ecedf0;
-  border-radius: 999px;
+.stream-code {
+  width: 100%;
+  max-width: 760px;
+  height: 280px;
+  border-radius: 12px;
+  background: #0f1117;
+  border: 1px solid #1f2330;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
   overflow: hidden;
+  position: relative;
+  text-align: left;
 }
-.shimmer-bar span {
-  display: block;
-  width: 40%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--gm-blue),
-    transparent
-  );
-  animation: shimmer-slide 1.4s linear infinite;
+.stream-code::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  background: linear-gradient(to bottom, rgba(15, 17, 23, 1), rgba(15, 17, 23, 0));
+  z-index: 2;
+  pointer-events: none;
+}
+.stream-code::after {
+  content: "HTML · streaming";
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  z-index: 3;
 }
 
-@keyframes shimmer-slide {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(350%); }
+.stream-code-tail {
+  margin: 0;
+  height: 100%;
+  padding: 1.1rem 1.2rem 1.2rem;
+  overflow: hidden;
+  font-family: "Fira Code", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+    Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #c2cbd6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  scrollbar-width: none;
+}
+.stream-code-tail::-webkit-scrollbar { display: none; }
+
+.stream-cursor {
+  display: inline-block;
+  width: 0.55em;
+  color: #6ad28a;
+  animation: stream-cursor-blink 0.9s steps(2) infinite;
+  vertical-align: text-bottom;
+  margin-left: 1px;
+}
+
+@keyframes stream-cursor-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }
 
 .preview-error {

@@ -141,7 +141,9 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
   const [previewModel, setPreviewModel] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [streamingText, setStreamingText] = useState("");
   const previewAbortRef = useRef<AbortController | null>(null);
+  const streamCodeRef = useRef<HTMLPreElement | null>(null);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -241,6 +243,8 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
     setPreviewModel(null);
     setPreviewError(null);
     setPreviewLoading(true);
+    setStreamingText("");
+
     try {
       const r = await fetch("/api/generate-site", {
         method: "POST",
@@ -257,31 +261,42 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
         }),
       });
 
-      const rawText = await r.text();
-      let data: any = null;
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        /* not JSON — likely an upstream timeout/HTML error page */
-      }
-
       if (!r.ok) {
-        if (r.status === 504 || r.status === 502) {
-          throw new Error(
-            "Generation timed out. Gemini took longer than the server allows. Try again — subsequent runs often succeed."
-          );
+        const text = await r.text();
+        let data: any = null;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          /* not JSON */
         }
         throw new Error(
-          data?.error ||
-            rawText.slice(0, 200) ||
-            `Generation failed (HTTP ${r.status}).`
+          data?.error || text.slice(0, 300) || `HTTP ${r.status}`
         );
       }
-      if (!data?.html) {
-        throw new Error("Server returned no HTML.");
+
+      setPreviewModel(r.headers.get("X-Used-Model") || null);
+
+      if (!r.body) throw new Error("No response stream.");
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        accumulated += decoder.decode(value, { stream: true });
+        setStreamingText(accumulated);
       }
-      setPreviewHtml(data.html);
-      setPreviewModel(data.model || null);
+
+      if (!accumulated.trim()) throw new Error("Empty response from Gemini.");
+
+      // Strip markdown fences if Gemini wrapped its output despite instructions.
+      let html = accumulated.trim();
+      const fence = /^```(?:html)?\s*([\s\S]*?)\s*```$/i.exec(html);
+      if (fence) html = fence[1].trim();
+
+      setPreviewHtml(html);
+      setStreamingText("");
     } catch (err: any) {
       if (err?.name === "AbortError") return;
       setPreviewError(err.message || "Generation failed");
@@ -290,6 +305,13 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
     }
   }
 
+  // Auto-scroll the streaming code preview to follow the latest text.
+  useEffect(() => {
+    if (streamCodeRef.current) {
+      streamCodeRef.current.scrollTop = streamCodeRef.current.scrollHeight;
+    }
+  }, [streamingText]);
+
   function closePreview() {
     previewAbortRef.current?.abort();
     setPreviewFor(null);
@@ -297,6 +319,7 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
     setPreviewModel(null);
     setPreviewError(null);
     setPreviewLoading(false);
+    setStreamingText("");
   }
 
   useEffect(() => {
@@ -635,10 +658,17 @@ export default function SearchClient({ mapsKey }: { mapsKey: string }) {
                     Designing a website for <strong>{previewFor.name}</strong>
                   </div>
                   <div className="preview-generating-sub">
-                    Gemini is composing the layout, copy, and stock photo
-                    selections — usually 10–25 seconds.
+                    {streamingText
+                      ? `Streaming live from Gemini · ${streamingText.length.toLocaleString()} characters`
+                      : "Connecting to Gemini…"}
                   </div>
-                  <div className="shimmer-bar"><span /></div>
+
+                  <div className="stream-code">
+                    <pre ref={streamCodeRef} className="stream-code-tail">
+                      {streamingText || "<!-- waiting for first bytes -->"}
+                      <span className="stream-cursor">▌</span>
+                    </pre>
+                  </div>
                 </div>
               )}
 

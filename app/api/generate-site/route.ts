@@ -4,19 +4,13 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-// Flash first: ~5-15s typical, comfortably under Vercel's 60s function
-// timeout, generous free-tier quota. Pro is higher-quality but routinely
-// times out on Hobby plans; kept as a fallback for paid keys.
-// To prefer Pro, reorder this array.
-const MODEL_CHAIN = [
-  "gemini-2.5-flash",
-  "gemini-2.5-pro",
-] as const;
+// Pro first for quality. With streaming the user sees progress immediately,
+// so a slower generation isn't a UX problem. Flash is the fallback if Pro
+// is over quota / not accessible on the user's tier.
+const MODEL_CHAIN = ["gemini-2.5-pro", "gemini-2.5-flash"] as const;
 
 function isQuotaOrAccessError(status: number, message: string) {
-  if (status === 429) return true;
-  if (status === 403) return true;
-  if (status === 404) return true;
+  if (status === 429 || status === 403 || status === 404) return true;
   const m = (message || "").toLowerCase();
   return (
     m.includes("quota") ||
@@ -81,15 +75,6 @@ OUTPUT FORMAT
 Output ONLY the HTML document, starting with \`<!doctype html>\`. No prose, no markdown, no \`\`\`html fences. Do not wrap the output in any other content.`;
 }
 
-function stripFences(s: string) {
-  let out = s.trim();
-  // Strip ```html ... ``` or ``` ... ```
-  const fence = /^```(?:html)?\s*([\s\S]*?)\s*```$/i;
-  const m = out.match(fence);
-  if (m) out = m[1].trim();
-  return out;
-}
-
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -128,20 +113,19 @@ export async function POST(req: Request) {
   }
 
   const prompt = buildPrompt(body);
-
+  const attempted: string[] = [];
   let lastErrorMsg = "Gemini call failed.";
   let lastErrorStatus = 502;
-  const attempted: string[] = [];
 
   for (const model of MODEL_CHAIN) {
     attempted.push(model);
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(
       geminiKey
     )}`;
 
-    let resp: Response;
+    let upstream: Response;
     try {
-      resp = await fetch(endpoint, {
+      upstream = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -149,10 +133,14 @@ export async function POST(req: Request) {
           generationConfig: {
             temperature: 0.85,
             topP: 0.95,
-            maxOutputTokens: 8192,
+            // No artificial cap on output — generate as much as needed.
+            // The model decides when the page is finished.
+            maxOutputTokens: 32768,
             responseMimeType: "text/plain",
           },
         }),
+        // Propagate client aborts so closing the modal cancels Gemini too.
+        signal: req.signal,
       });
     } catch (e: any) {
       lastErrorMsg = `Network error calling Gemini: ${e.message || e}`;
@@ -160,8 +148,8 @@ export async function POST(req: Request) {
       continue;
     }
 
-    if (!resp.ok) {
-      const text = await resp.text();
+    if (!upstream.ok) {
+      const text = await upstream.text();
       let parsed: any = text;
       try {
         parsed = JSON.parse(text);
@@ -171,36 +159,35 @@ export async function POST(req: Request) {
       const message =
         parsed?.error?.message ||
         (typeof parsed === "string" ? parsed : null) ||
-        `Gemini API error (HTTP ${resp.status}).`;
+        `Gemini API error (HTTP ${upstream.status}).`;
       lastErrorMsg = message;
-      lastErrorStatus = resp.status;
+      lastErrorStatus = upstream.status;
 
-      if (isQuotaOrAccessError(resp.status, message)) {
-        // Try the next model in the chain.
-        continue;
-      }
-      // Non-recoverable error (bad request, auth, etc.) — surface immediately.
+      if (isQuotaOrAccessError(upstream.status, message)) continue;
       return NextResponse.json(
         { error: message, attempted },
-        { status: resp.status }
+        { status: upstream.status }
       );
     }
 
-    const data = await resp.json();
-    const text: string | undefined = data?.candidates?.[0]?.content?.parts
-      ?.map((p: any) => p?.text || "")
-      .join("");
-
-    if (!text) {
-      lastErrorMsg = "Gemini returned no content.";
-      lastErrorStatus = 502;
+    if (!upstream.body) {
+      lastErrorMsg = "Empty response from Gemini.";
       continue;
     }
 
-    return NextResponse.json({
-      html: stripFences(text),
-      model,
-      attempted,
+    // Got a streaming response — commit to this model and pipe its SSE
+    // through as plain text deltas the client can append to a buffer.
+    const transformed = transformGeminiSSE(upstream.body);
+
+    return new Response(transformed, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Used-Model": model,
+        // Tell intermediaries (proxies, CDNs) not to buffer the stream.
+        "X-Accel-Buffering": "no",
+      },
     });
   }
 
@@ -211,4 +198,58 @@ export async function POST(req: Request) {
     },
     { status: lastErrorStatus }
   );
+}
+
+// Parse Gemini's Server-Sent Events stream and write only the text deltas
+// (no JSON wrappers) to a new ReadableStream the client consumes directly.
+function transformGeminiSSE(upstream: ReadableStream<Uint8Array>) {
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = "";
+
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const reader = upstream.getReader();
+
+      function processLine(line: string) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) return;
+        const data = trimmed.slice(5).trim();
+        if (!data) return;
+        try {
+          const json = JSON.parse(data);
+          const parts = json?.candidates?.[0]?.content?.parts;
+          if (Array.isArray(parts)) {
+            const text = parts.map((p: any) => p?.text || "").join("");
+            if (text) controller.enqueue(encoder.encode(text));
+          }
+        } catch {
+          /* ignore malformed event */
+        }
+      }
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            // Flush any trailing buffered line.
+            if (buffer.trim()) processLine(buffer);
+            break;
+          }
+          buffer += decoder.decode(value, { stream: true });
+          let nl: number;
+          while ((nl = buffer.indexOf("\n")) >= 0) {
+            const line = buffer.slice(0, nl);
+            buffer = buffer.slice(nl + 1);
+            processLine(line);
+          }
+        }
+      } catch {
+        // Upstream errored — best effort; close cleanly so the client
+        // sees the stream end and renders whatever it has.
+      } finally {
+        controller.close();
+      }
+    },
+  });
 }
